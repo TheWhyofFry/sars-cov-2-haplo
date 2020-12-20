@@ -1,0 +1,61 @@
+import pandas as pd 
+
+
+sarscov2_genelist = "assets/2697049_genelist.csv"
+
+
+genelist_df = pd.read_csv(sarscov2_genelist).set_index("gene", drop=False)
+
+def cliquesnv_coord(genelist, gene):
+	
+	gene = genelist.loc[gene,]
+
+	start, end = gene.start, gene.end
+
+
+	command_str = " -sp {start} -ep {end} -os {start} -oe {end} ".format(start=start-1, end=end-1)
+
+
+		
+
+	return command_str
+
+def get_gene_bams(sample):
+
+	haplotype_info = pd.read_csv("output/haplotypes/{sample}_haplotype_info.txt".format(sample=sample))
+
+	haplotype_info[haplotype_info.passed == True]
+
+	return ["output/haplotypes/{{sample}}{gene}.bam".format(gene=gene) for gene in haplotype_info.gene.values]
+	
+
+
+
+checkpoint getgenebam:
+        input:
+                #output/assembly/079-2003-5/11676/refined
+                bam="output/assembly/{sample}/{taxon}/refined/{sample}_asm_refined.bam"
+
+        output:
+		gene_bam = "output/haplotypes/{sample}_haplotype_info.txt"
+        params:
+                genecoords=
+        shell:
+                "python3 scripts/cliquesnvhaplo.py  -b {input.bam} -g {params.genelist} -o output/haplotype/{sample} "
+
+
+rule cliquesnv:
+	input:
+		gene_bam="output/haplotype/{sample}/{gene}.bam"
+
+
+rule cliquesnv_agg:
+	input:
+		lambda wildcards: get_gene_bams(wildcards.sample)
+		
+	output:
+		"output/haplotypes/{sample}_haplotype_dont.txt"
+
+	shell:
+		"touch {output}"
+
