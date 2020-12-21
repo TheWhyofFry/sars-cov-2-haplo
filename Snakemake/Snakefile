@@ -1,16 +1,36 @@
 import pandas as pd 
+import os
 
+
+
+from glob import glob
+from io import StringIO
+
+import pysam
 
 sarscov2_genelist = "assets/2697049_genelist.csv"
 
 
 genelist_df = pd.read_csv(sarscov2_genelist).set_index("gene", drop=False)
 
-def cliquesnv_coord(genelist, gene):
+def cliquesnv_coords(genelist, genename, sample):
 	
-	gene = genelist.loc[gene,]
+	gene = genelist.loc[genename,]
 
 	start, end = gene.start, gene.end
+
+	# Dumb thing with cliquesnv if the specified boundaries have 0 depth
+	print("sample",sample)
+	print("gene",gene)
+	bam = "output/haplotype/{sample}/{gene}.bam".format(gene=genename, sample=sample)
+	print("Bam:",bam)
+	with StringIO(pysam.depth(bam)) as sio:
+		depth_df = pd.read_table(sio, header=None, names=["ref","pos","depth"], sep="\t")
+
+	
+	start = max([start, depth_df.pos.min()])
+	end   = min([end, depth_df.pos.max()])
+	
 
 
 	command_str = " -sp {start} -ep {end} -os {start} -oe {end} ".format(start=start-1, end=end-1)
@@ -20,42 +40,150 @@ def cliquesnv_coord(genelist, gene):
 
 	return command_str
 
-def get_gene_bams(sample):
+def get_genes(wildcards):
+	checkpoints.getgenebam.get(**wildcards).output
 
-	haplotype_info = pd.read_csv("output/haplotypes/{sample}_haplotype_info.txt".format(sample=sample))
+	haplotype_info = pd.read_csv("output/haplotype/{sample}/{sample}_haplotype_info.txt".format(sample=wildcards.sample))
+	#haplotype_info[haplotype_info["pass"] == True]
+	haplotype_info = haplotype_info[haplotype_info.reads > 50]
 
-	haplotype_info[haplotype_info.passed == True]
-
-	return ["output/haplotypes/{{sample}}{gene}.bam".format(gene=gene) for gene in haplotype_info.gene.values]
+	#return ["output/haplotypes/{{sample}}{gene}.bam".format(gene=gene) for gene in haplotype_info.gene.values]
+	gene = glob_wildcards(os.path.join("output/haplotype",wildcards.sample,"{gene}.bam")).gene
+	gene = [g for g in gene if (not "downsample" in g)]
+	gene = list(set(gene).intersection(haplotype_info.gene.values))
+	return gene
+	#return expand("output/haplotype/{sample}/{gene}.bam", sample=wildcards.sample, gene=gene)
 	
+
+def get_input(inputdir):
+	
+	bam_files = glob("%s/*.bam"%inputdir)
+	basenames = list(map(os.path.basename, bam_files))
+	print(basenames)
+	try:
+		max_delim = max(map(lambda x:x.count("_"), basenames))
+	except ValueError:
+		max_delim = 0
+
+	if max_delim == 0:
+		s = pd.Series([n.replace(".bam","") for n in basenames])
+	for i in range(max_delim):
+		s = pd.Series(map(lambda x:x.split("_")[i], basenames))
+		l = len(s)
+			
+		if sum(s.drop_duplicates()) == l:
+			break
+
+	return pd.DataFrame(dict(samplename=s.values, filename=bam_files)).set_index("samplename",drop=False)
+
+
+
+sample_df = get_input(config["inputdir"])
+
+
+rule all:
+	input:
+		haploinfo=expand("output/haplotype/{sample}/{sample}_haplotype_info.txt",sample=sample_df.samplename),
+		#clique_agg=expand("output/{sample}_cliquesnvagg.txt",sample=sample_df.samplename),
+		#cliqueagg=expand("output/haplotype/{sample}_haplotype.txt",sample=sample_df.samplename.values), 
+		virulign=expand("output/{sample}_virulign.txt",sample=sample_df.samplename.values), 
+
 
 
 
 checkpoint getgenebam:
+	input:
+		bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename,
+		bai=lambda wildcards: "{bam}.bai".format(bam=sample_df.loc[wildcards.sample,].filename)
+
+	output:
+		haplotype_info="output/haplotype/{sample}/{sample}_haplotype_info.txt",
+	params:
+		genelist="assets/2697049_genelist.csv",
+		output_dir="output/haplotype/{sample}/"
+	shell:
+		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample}  -b {input.bam} -g {params.genelist} -o {params.output_dir} "
+
+
+rule getgenebam_agg:
+	input:
+		get_genes
+
+	output:
+		temporary("output/{sample}_haplotypes.txt")
+	shell:
+		"touch {output}"
+
+
+rule subsample_genebam:
         input:
-                #output/assembly/079-2003-5/11676/refined
-                bam="output/assembly/{sample}/{taxon}/refined/{sample}_asm_refined.bam"
-
+                bam="output/haplotype/{sample}/{gene}.bam"
         output:
-		gene_bam = "output/haplotypes/{sample}_haplotype_info.txt"
-        params:
-                genecoords=
-        shell:
-                "python3 scripts/cliquesnvhaplo.py  -b {input.bam} -g {params.genelist} -o output/haplotype/{sample} "
+                bam=temporary("output/haplotype/{sample}/{gene}.downsample.bam")
 
+        params: 
+                max_depth=1000
+
+        shell: 
+                "java -jar tools/sortsamrefname.jar {input.bam} | java -jar tools/biostar154220.jar -n {params.max_depth} | samtools sort - > {output.bam}"
+
+
+rule subsample_genebam_agg:
+	input:
+		get_genes
+	output:
+		"output/{sample}.downsample.txt"
+	shell:
+		"touch {output}"
 
 rule cliquesnv:
 	input:
-		gene_bam="output/haplotype/{sample}/{gene}.bam"
-
+		gene_bam="output/haplotype/{sample}/{gene}.downsample.bam"
+		#gene_bam=rules.subsample_genebam.output.bam
+	output:
+		cliquesnv="output/haplotype/{sample}/{gene}.fasta"
+	params:
+		clique_coord = lambda wildcards: cliquesnv_coords(genelist_df, wildcards.gene, wildcards.sample),
+		outdir = lambda wildcards: "output/haplotype/{sample}/".format(sample=wildcards.sample),
+		cliquesnv_orig=lambda wildcards: "output/haplotype/{sample}/{gene}.downsample.fasta".format(sample=wildcards.sample, gene=wildcards.gene)
+	threads: 2
+	shell:
+		"java -Xmx8G -jar tools/clique-snv.jar {params} -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && "
+		"mv {params.cliquesnv_orig} {output.cliquesnv}"
 
 rule cliquesnv_agg:
 	input:
-		lambda wildcards: get_gene_bams(wildcards.sample)
-		
+		lambda wildcards: expand("output/haplotype/{sample}/{gene}.bam", sample=wildcards.sample, gene=get_genes(wildcards))
 	output:
-		"output/haplotypes/{sample}_haplotype_dont.txt"
-
+		temporary("output/{sample}_cliquesnvagg.txt")
 	shell:
 		"touch {output}"
+
+rule virulign:
+	input:
+		"output/haplotype/{sample}/{gene}.fasta"
+
+	output:
+		"output/virulign/{gene}/{sample}.csv"
+	
+	threads: 4
+
+	shell:
+		"virulign assets/virulign/{wildcards.gene}.xml {input} --exportReferenceSequence yes --exportKind PositionTable --exportAlphabet AminoAcids > {output}"
+
+
+
+rule virulign_agg:
+	input:
+		lambda wildcards: expand("output/virulign/{gene}/{sample}.csv", sample=wildcards.sample, gene=get_genes(wildcards)),
+
+	output:
+		temporary("output/{sample}_virulign.txt")
+	
+	shell:
+		"touch {output}"
+
+
+	
+
 

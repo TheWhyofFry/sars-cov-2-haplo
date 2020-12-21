@@ -14,7 +14,7 @@ import subprocess
 import pysam
 import argparse
 
-
+import sys
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -54,7 +54,7 @@ if __name__ == "__main__":
         # Check bam file - if reads < 100 - fail
         command_out = subprocess.getoutput(command_str)
 
-
+        
         command_bamcheck = 'samtools view {outfile} | grep -v "^@" | wc -l'.format(outfile=output_filename)
 
         num_reads = int(subprocess.getoutput(command_bamcheck))
@@ -69,6 +69,8 @@ if __name__ == "__main__":
     coords_df["reads_base"] = reads_base
     coords_df["pass"] = passed
     coords_df.to_csv(os.path.join(args.output_folder,"{prefix}_haplotype_info.txt".format(prefix=args.output_prefix)))
+
+    sys.exit(0)
 
 
 
