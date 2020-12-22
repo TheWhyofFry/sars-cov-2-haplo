@@ -20,10 +20,10 @@ def cliquesnv_coords(genelist, genename, sample):
 	start, end = gene.start, gene.end
 
 	# Dumb thing with cliquesnv if the specified boundaries have 0 depth
-	print("sample",sample)
-	print("gene",gene)
+	# So we check the minimum/max positions that have coverage and adjust 
+	# the start/stop positions accordingly
+
 	bam = "output/haplotype/{sample}/{gene}.bam".format(gene=genename, sample=sample)
-	print("Bam:",bam)
 	with StringIO(pysam.depth(bam)) as sio:
 		depth_df = pd.read_table(sio, header=None, names=["ref","pos","depth"], sep="\t")
 
@@ -81,13 +81,15 @@ def get_input(inputdir):
 sample_df = get_input(config["inputdir"])
 
 
+
+
 rule all:
 	input:
 		haploinfo=expand("output/haplotype/{sample}/{sample}_haplotype_info.txt",sample=sample_df.samplename),
-		#clique_agg=expand("output/{sample}_cliquesnvagg.txt",sample=sample_df.samplename),
+		clique_agg=expand("output/{sample}_cliquesnvagg.txt",sample=sample_df.samplename),
 		#cliqueagg=expand("output/haplotype/{sample}_haplotype.txt",sample=sample_df.samplename.values), 
 		virulign=expand("output/{sample}_virulign.txt",sample=sample_df.samplename.values), 
-
+		#agg_csv="output/mutation_table_aggregate.csv",
 
 
 
@@ -110,7 +112,7 @@ rule getgenebam_agg:
 		get_genes
 
 	output:
-		temporary("output/{sample}_haplotypes.txt")
+		"output/{sample}_haplotypes.txt"
 	shell:
 		"touch {output}"
 
@@ -141,21 +143,30 @@ rule cliquesnv:
 		gene_bam="output/haplotype/{sample}/{gene}.downsample.bam"
 		#gene_bam=rules.subsample_genebam.output.bam
 	output:
-		cliquesnv="output/haplotype/{sample}/{gene}.fasta"
+		cliquesnv="output/haplotype/{sample}/{gene}.downsample.fasta"
 	params:
 		clique_coord = lambda wildcards: cliquesnv_coords(genelist_df, wildcards.gene, wildcards.sample),
 		outdir = lambda wildcards: "output/haplotype/{sample}/".format(sample=wildcards.sample),
 		cliquesnv_orig=lambda wildcards: "output/haplotype/{sample}/{gene}.downsample.fasta".format(sample=wildcards.sample, gene=wildcards.gene)
 	threads: 2
 	shell:
-		"java -Xmx8G -jar tools/clique-snv.jar {params} -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && "
-		"mv {params.cliquesnv_orig} {output.cliquesnv}"
+		"java -Xmx8G -jar tools/clique-snv.jar {params} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero "
+
+rule cliquesnvparse:
+	input:
+		rules.cliquesnv.output
+	output:
+		cliquesnv="output/haplotype/{sample}/{gene}.fasta"
+	shell:
+		"python3 scripts/parsecliquesnv.py -m 9 -i {input} -n {wildcards.sample} -o {output.cliquesnv}"
+
+
 
 rule cliquesnv_agg:
 	input:
 		lambda wildcards: expand("output/haplotype/{sample}/{gene}.bam", sample=wildcards.sample, gene=get_genes(wildcards))
 	output:
-		temporary("output/{sample}_cliquesnvagg.txt")
+		"output/{sample}_cliquesnvagg.txt"
 	shell:
 		"touch {output}"
 
@@ -172,16 +183,34 @@ rule virulign:
 		"virulign assets/virulign/{wildcards.gene}.xml {input} --exportReferenceSequence yes --exportKind PositionTable --exportAlphabet AminoAcids > {output}"
 
 
+rule virulign_process:
+	input:
+		rules.virulign.output
+	output:
+		mut_table="output/mutation_tables/{sample}_{gene}.csv",
+		agg_table="output/agg_aatables/{sample}_{gene}.csv",
+		normal_table="output/aatables/{sample}_{gene}.csv"
+	shell:
+		"python3 scripts/virulignparse.py -i {input} -m {output.mut_table} -a {output.agg_table} -n {output.normal_table}"
+
 
 rule virulign_agg:
 	input:
-		lambda wildcards: expand("output/virulign/{gene}/{sample}.csv", sample=wildcards.sample, gene=get_genes(wildcards)),
+		samp=lambda wildcards: expand("output/virulign/{gene}/{sample}.csv", sample=wildcards, gene=get_genes(wildcards)),
+		genes=lambda wildcards: expand("output/mutation_tables/{sample}_{gene}.csv", sample=sample_df.samplename, gene=get_genes(wildcards)) 
+
+		
 
 	output:
-		temporary("output/{sample}_virulign.txt")
+		vlign=temporary("output/{sample}_virulign.txt"),
+		
+	params:
+		agg_csv="output/mutation_table_aggregate.csv"
+		
 	
 	shell:
-		"touch {output}"
+		"touch {output};"
+		"python3 scripts/aggregate.py -c {input.genes} -o {params.agg_csv}"
 
 
 	
