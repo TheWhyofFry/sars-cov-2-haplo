@@ -9,6 +9,7 @@ impute and extract putative hapoltypes and run the result through Virulign.
 
 The following modules are needed:
 
+- snakemake
 - pysam
 - pandas
 
