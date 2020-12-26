@@ -10,14 +10,14 @@ with those in the [reference SARS-CoV-2 genome](https://www.ncbi.nlm.nih.gov/nuc
 
 The following modules are needed:
 
-* Python:
-- snakemake
-- pysam
-- pandas
+1. Python:
+  - snakemake
+  - pysam
+  - pandas
 
-* General:
-- samtools
-- [virulign](https://github.com/rega-cev/virulign) 
+2. General:
+  - samtools
+  - [virulign](https://github.com/rega-cev/virulign) 
 
 
 # Running example 
