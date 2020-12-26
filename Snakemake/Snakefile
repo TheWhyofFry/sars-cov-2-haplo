@@ -47,12 +47,10 @@ def get_genes(wildcards):
 	#haplotype_info[haplotype_info["pass"] == True]
 	haplotype_info = haplotype_info[haplotype_info.reads > 50]
 
-	#return ["output/haplotypes/{{sample}}{gene}.bam".format(gene=gene) for gene in haplotype_info.gene.values]
 	gene = glob_wildcards(os.path.join("output/haplotype",wildcards.sample,"{gene}.bam")).gene
 	gene = [g for g in gene if (not "downsample" in g)]
 	gene = list(set(gene).intersection(haplotype_info.gene.values))
 	return gene
-	#return expand("output/haplotype/{sample}/{gene}.bam", sample=wildcards.sample, gene=gene)
 	
 
 def get_input(inputdir):
@@ -89,7 +87,7 @@ rule all:
 		clique_agg=expand("output/{sample}_cliquesnvagg.txt",sample=sample_df.samplename),
 		#cliqueagg=expand("output/haplotype/{sample}_haplotype.txt",sample=sample_df.samplename.values), 
 		virulign=expand("output/{sample}_virulign.txt",sample=sample_df.samplename.values), 
-		#agg_csv="output/mutation_table_aggregate.csv",
+		agg_csv="output/mutation_table_aggregate.csv",
 
 
 
@@ -109,7 +107,7 @@ checkpoint getgenebam:
 
 rule getgenebam_agg:
 	input:
-		get_genes
+		lambda wildcards: expand("output/haplotype/{{sample}}/{gene}", gene=get_genes(wildcards))
 
 	output:
 		"output/{sample}_haplotypes.txt"
@@ -130,13 +128,6 @@ rule subsample_genebam:
                 "java -jar tools/sortsamrefname.jar {input.bam} | java -jar tools/biostar154220.jar -n {params.max_depth} | samtools sort - > {output.bam}"
 
 
-rule subsample_genebam_agg:
-	input:
-		get_genes
-	output:
-		"output/{sample}.downsample.txt"
-	shell:
-		"touch {output}"
 
 rule cliquesnv:
 	input:
@@ -164,7 +155,7 @@ rule cliquesnvparse:
 
 rule cliquesnv_agg:
 	input:
-		lambda wildcards: expand("output/haplotype/{sample}/{gene}.bam", sample=wildcards.sample, gene=get_genes(wildcards))
+		lambda wildcards: expand("output/haplotype/{{sample}}/{gene}.fasta", sample=wildcards.sample, gene=get_genes(wildcards))
 	output:
 		"output/{sample}_cliquesnvagg.txt"
 	shell:
@@ -196,23 +187,31 @@ rule virulign_process:
 
 rule virulign_agg:
 	input:
-		samp=lambda wildcards: expand("output/virulign/{gene}/{sample}.csv", sample=wildcards, gene=get_genes(wildcards)),
-		genes=lambda wildcards: expand("output/mutation_tables/{sample}_{gene}.csv", sample=sample_df.samplename, gene=get_genes(wildcards)) 
+		samp=lambda wildcards: expand("output/virulign/{gene}/{sample}.csv", sample=wildcards.sample, gene=get_genes(wildcards)),
+		genes=lambda wildcards: expand("output/mutation_tables/{sample}_{gene}.csv", sample=wildcards.sample, gene=get_genes(wildcards)) 
+	
 
 		
 
 	output:
 		vlign=temporary("output/{sample}_virulign.txt"),
+		agg_csv="output/{sample}_mutation_table_aggregate.csv"
 		
 	params:
-		agg_csv="output/mutation_table_aggregate.csv"
+		agg_csv="output/{sample}_mutation_table_aggregate.csv"
 		
 	
 	shell:
 		"touch {output};"
-		"python3 scripts/aggregate.py -c {input.genes} -o {params.agg_csv}"
+		"python3 scripts/aggregate.py -c {input.genes} -o {output.agg_csv}"
 
+rule muttable_agg:
+	input:
+		expand("output/{sample}_mutation_table_aggregate.csv", sample=sample_df.samplename)
+	output:
+		"output/mutation_table_aggregate.csv"
+	shell:
+		"python scripts/aggregate.py -c {input} -o {output}"
 
-	
 
 
