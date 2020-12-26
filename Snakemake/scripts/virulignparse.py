@@ -159,6 +159,6 @@ if __name__ == "__main__":
             ofile.write("")
     agg.to_csv(args.aggfile)
 
-    y.iloc[:,2:].to_csv(args.normalfile)
+    y.to_csv(args.normalfile)
 
 
