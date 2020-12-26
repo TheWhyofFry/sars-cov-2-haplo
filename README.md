@@ -25,7 +25,7 @@ The following modules are needed:
 
 Create a folder called "inputdir" and place your BAMs within this folder.  Run the following command
 
-`snakemake -j 4 -p --inputdir=inputdir`
+`snakemake -j 4 -p --config inputdir=inputdir` -k
 
 
 
