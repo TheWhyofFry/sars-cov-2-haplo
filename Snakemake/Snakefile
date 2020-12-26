@@ -83,10 +83,8 @@ sample_df = get_input(config["inputdir"])
 
 rule all:
 	input:
-		haploinfo=expand("output/haplotype/{sample}/{sample}_haplotype_info.txt",sample=sample_df.samplename),
-		clique_agg=expand("output/{sample}_cliquesnvagg.txt",sample=sample_df.samplename),
-		#cliqueagg=expand("output/haplotype/{sample}_haplotype.txt",sample=sample_df.samplename.values), 
-		virulign=expand("output/{sample}_virulign.txt",sample=sample_df.samplename.values), 
+		#haploinfo=expand("output/haplotype/{sample}/{sample}_haplotype_info.txt",sample=sample_df.samplename),
+		#clique_agg=expand("output/{sample}_cliquesnvagg.txt",sample=sample_df.samplename),
 		agg_csv="output/mutation_table_aggregate.csv",
 
 
@@ -149,7 +147,7 @@ rule cliquesnvparse:
 	output:
 		cliquesnv="output/haplotype/{sample}/{gene}.fasta"
 	shell:
-		"python3 scripts/parsecliquesnv.py -m 9 -i {input} -n {wildcards.sample} -o {output.cliquesnv}"
+		"python3 scripts/parsecliquesnv.py -m 12 -i {input} -n {wildcards.sample} -o {output.cliquesnv}"
 
 
 
