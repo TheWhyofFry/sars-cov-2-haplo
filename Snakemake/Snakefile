@@ -136,10 +136,10 @@ rule cliquesnv:
 	params:
 		clique_coord = lambda wildcards: cliquesnv_coords(genelist_df, wildcards.gene, wildcards.sample),
 		outdir = lambda wildcards: "output/haplotype/{sample}/".format(sample=wildcards.sample),
-		cliquesnv_orig=lambda wildcards: "output/haplotype/{sample}/{gene}.downsample.fasta".format(sample=wildcards.sample, gene=wildcards.gene)
+		#cliquesnv_orig=lambda wildcards: "output/haplotype/{sample}/{gene}.downsample.fasta".format(sample=wildcards.sample, gene=wildcards.gene)
 	threads: 2
 	shell:
-		"java -Xmx8G -jar tools/clique-snv.jar {params} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero "
+		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero "
 
 rule cliquesnvparse:
 	input:
