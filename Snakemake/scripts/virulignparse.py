@@ -2,6 +2,10 @@ import pandas as pd
 import argparse
 import re
 import numpy as np
+
+
+import sys
+
 def fixheadernumbering(header,padding=4):
     header_template = "%%s_%%0%sdins%%0%sd"%(padding,padding)
     
