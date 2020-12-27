@@ -146,6 +146,13 @@ if __name__ == "__main__":
 
     ref_seq = v.virulign_df.iloc[0,0]
 
+    if len(v.virulign_df) < 2:
+        for filename in [args.normalfile, args.aggfile, args.mutaggfile]:
+            with open(filename,"w") as ofile:
+                ofile.write()
+                ofile.close()
+        sys.exit(0)
+
     y = repairseq(splitseqid(v.virulign_df_m), ref_seq).sort_values(["gene","pos","prop"],ascending=[True,True,False])
 
     agg = y.groupby(["samplename","gene","pos","new_aa"]).aggregate({"prop":sum, "haplonum":lambda x: "/".join(x)}).reset_index().sort_values(["samplename","gene","pos","prop"],ascending=[True,True,True,False])
