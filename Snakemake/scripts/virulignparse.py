@@ -149,7 +149,7 @@ if __name__ == "__main__":
     if len(v.virulign_df) < 2:
         for filename in [args.normalfile, args.aggfile, args.mutaggfile]:
             with open(filename,"w") as ofile:
-                ofile.write()
+                ofile.write("")
                 ofile.close()
         sys.exit(0)
 
