@@ -26,6 +26,7 @@ def cliquesnv_coords(genelist, genename, sample):
 	bam = "output/haplotype/{sample}/{gene}.bam".format(gene=genename, sample=sample)
 	with StringIO(pysam.depth(bam)) as sio:
 		depth_df = pd.read_table(sio, header=None, names=["ref","pos","depth"], sep="\t")
+		depth_df = depth_df[depth_df.depth > 1]
 
 	
 	start = max([start, depth_df.pos.min()])
