@@ -70,7 +70,7 @@ def get_input(inputdir):
 		s = pd.Series(map(lambda x:x.split("_")[i], basenames))
 		l = len(s)
 			
-		if sum(s.drop_duplicates()) == l:
+		if len(s.drop_duplicates()) == l:
 			break
 
 	return pd.DataFrame(dict(samplename=s.values, filename=bam_files)).set_index("samplename",drop=False)

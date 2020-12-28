@@ -28,4 +28,13 @@ Create a folder called "inputdir" and place your BAMs within this folder.  Run t
 `snakemake -j 4 -p --config inputdir=inputdir -k`
 
 
+# Output
+
+
+
+
+
+
+
+
 
