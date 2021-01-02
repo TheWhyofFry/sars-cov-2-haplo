@@ -19,14 +19,14 @@ def cliquesnv_coords(genelist, genename, sample):
 
 	start, end = gene.start, gene.end
 
-	# Dumb thing with cliquesnv if the specified boundaries have 0 depth
+	# Dumb thing with cliquesnv if the specified boundaries have less then 3 depth
 	# So we check the minimum/max positions that have coverage and adjust 
 	# the start/stop positions accordingly
 
 	bam = "output/haplotype/{sample}/{gene}.bam".format(gene=genename, sample=sample)
 	with StringIO(pysam.depth(bam)) as sio:
 		depth_df = pd.read_table(sio, header=None, names=["ref","pos","depth"], sep="\t")
-		depth_df = depth_df[depth_df.depth > 1]
+		depth_df = depth_df[depth_df.depth > 5]
 
 	
 	start = max([start, depth_df.pos.min()])
@@ -137,7 +137,7 @@ rule subsample_genebam:
                 max_depth=1000
 
         shell: 
-                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | samtools sort - > {output.bam}"
+                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | samtools sort - > {output.bam} && rm {input.bam}"
 
 
 
