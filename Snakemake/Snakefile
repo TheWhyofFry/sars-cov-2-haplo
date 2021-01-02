@@ -137,13 +137,14 @@ rule subsample_genebam:
                 max_depth=1000
 
         shell: 
-                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | samtools sort - > {output.bam} && rm {input.bam}"
+                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | samtools sort - > {output.bam}"
 
 
 
 rule cliquesnv:
 	input:
 		gene_bam="output/haplotype/{sample}/{gene}.downsample.bam"
+		gene_orig_bam="output/haplotype/{sample}/{gene}.bam"
 		#gene_bam=rules.subsample_genebam.output.bam
 	output:
 		cliquesnv="output/haplotype/{sample}/{gene}.downsample.fasta"
@@ -154,7 +155,7 @@ rule cliquesnv:
 	resources: 
 		mem=10
 	shell:
-		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero "
+		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && rm {intput.gene_orig_bam}"
 
 rule cliquesnvparse:
 	input:
