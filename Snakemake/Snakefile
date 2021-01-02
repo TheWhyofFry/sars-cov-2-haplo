@@ -60,7 +60,7 @@ def get_input(inputdir):
 	basenames = list(map(os.path.basename, bam_files))
 	print(basenames)
 	try:
-		max_delim = max(map(lambda x:x.count("_"), basenames))
+		max_delim = min(map(lambda x:x.count("_"), basenames))
 	except ValueError:
 		max_delim = 0
 
@@ -84,8 +84,6 @@ sample_df = get_input(config["inputdir"])
 
 rule all:
 	input:
-		#haploinfo=expand("output/haplotype/{sample}/{sample}_haplotype_info.txt",sample=sample_df.samplename),
-		#clique_agg=expand("output/{sample}_cliquesnvagg.txt",sample=sample_df.samplename),
 		agg_csv="output/mutation_table_aggregate.csv",
 
 
@@ -137,8 +135,8 @@ rule cliquesnv:
 	params:
 		clique_coord = lambda wildcards: cliquesnv_coords(genelist_df, wildcards.gene, wildcards.sample),
 		outdir = lambda wildcards: "output/haplotype/{sample}/".format(sample=wildcards.sample),
-		#cliquesnv_orig=lambda wildcards: "output/haplotype/{sample}/{gene}.downsample.fasta".format(sample=wildcards.sample, gene=wildcards.gene)
 	threads: 2
+	resources: 10
 	shell:
 		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero "
 
@@ -168,7 +166,7 @@ rule virulign:
 		"output/virulign/{gene}/{sample}.csv"
 	
 	threads: 4
-
+	resources: 10
 	shell:
 		"virulign assets/virulign/{wildcards.gene}.xml {input} --exportReferenceSequence yes --exportKind PositionTable --exportAlphabet AminoAcids > {output}"
 
@@ -194,7 +192,7 @@ rule virulign_agg:
 
 	output:
 		vlign=temporary("output/{sample}_virulign.txt"),
-		agg_csv="output/{sample}_mutation_table_aggregate.csv"
+		agg_csv="output/mutation_tables_agg/{sample}_mutation_table_aggregate.csv"
 		
 	params:
 		agg_csv="output/{sample}_mutation_table_aggregate.csv"
@@ -206,7 +204,7 @@ rule virulign_agg:
 
 rule muttable_agg:
 	input:
-		expand("output/{sample}_mutation_table_aggregate.csv", sample=sample_df.samplename)
+		expand("output/mutation_tables_agg/{sample}_mutation_table_aggregate.csv", sample=sample_df.samplename)
 	output:
 		"output/mutation_table_aggregate.csv"
 	shell:
