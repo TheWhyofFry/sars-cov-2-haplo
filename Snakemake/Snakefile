@@ -136,7 +136,8 @@ rule cliquesnv:
 		clique_coord = lambda wildcards: cliquesnv_coords(genelist_df, wildcards.gene, wildcards.sample),
 		outdir = lambda wildcards: "output/haplotype/{sample}/".format(sample=wildcards.sample),
 	threads: 2
-	resources: 10
+	resources: 
+		mem=10
 	shell:
 		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero "
 
@@ -166,7 +167,8 @@ rule virulign:
 		"output/virulign/{gene}/{sample}.csv"
 	
 	threads: 4
-	resources: 10
+	resources: 
+		mem=10
 	shell:
 		"virulign assets/virulign/{wildcards.gene}.xml {input} --exportReferenceSequence yes --exportKind PositionTable --exportAlphabet AminoAcids > {output}"
 
