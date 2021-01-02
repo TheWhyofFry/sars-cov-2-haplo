@@ -67,7 +67,7 @@ def get_input(inputdir):
 	if max_delim == 0:
 		s = pd.Series([n.replace(".bam","") for n in basenames])
 	for i in range(max_delim):
-		s = pd.Series(map(lambda x:x.split("_")[i], basenames))
+		s = pd.Series(map(lambda x:x.split("_")[:(i+1)], basenames))
 		l = len(s)
 			
 		if len(s.drop_duplicates()) == l:
