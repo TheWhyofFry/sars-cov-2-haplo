@@ -23,10 +23,10 @@ if __name__ == "__main__":
         except pd.errors.EmptyDataError:
             print("File %s is empty"%filename)
             pass
-    print("CSVlist len:",len(csv_list))
+    #print("CSVlist len:",len(csv_list))
 
     p = pd.concat(csv_list,axis=0)
-    print(p)
+    #print(p)
     p.to_csv(args.outfile)
 
 

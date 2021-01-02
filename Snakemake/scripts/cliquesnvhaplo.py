@@ -48,7 +48,7 @@ if __name__ == "__main__":
                                                                                                        end=row.end,
                                                                                                        outfile=output_filename)
 
-        print("Command: \n%s"%command_str)
+        #print("Command: \n%s"%command_str)
         
 
         # Check bam file - if reads < 100 - fail
@@ -58,7 +58,7 @@ if __name__ == "__main__":
         command_bamcheck = 'samtools view {outfile} | grep -v "^@" | wc -l'.format(outfile=output_filename)
 
         num_reads = int(subprocess.getoutput(command_bamcheck))
-        print("Num reads:", num_reads)
+        #print("Num reads:", num_reads)
         reads[i] = num_reads
         if os.path.exists(output_filename):
             passed[i] = True

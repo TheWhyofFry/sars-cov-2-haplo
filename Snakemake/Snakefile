@@ -137,7 +137,7 @@ rule subsample_genebam:
                 max_depth=1000
 
         shell: 
-                "java -jar tools/sortsamrefname.jar {input.bam} | java -jar tools/biostar154220.jar -n {params.max_depth} | samtools sort - > {output.bam}"
+                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | samtools sort - > {output.bam}"
 
 
 
