@@ -155,7 +155,7 @@ rule cliquesnv:
 	resources: 
 		mem=10
 	shell:
-		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && rm {intput.gene_orig_bam}"
+		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && rm {input.gene_orig_bam}"
 
 rule cliquesnvparse:
 	input:
