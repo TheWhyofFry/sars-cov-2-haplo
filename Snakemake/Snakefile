@@ -77,6 +77,8 @@ def get_input(inputdir):
 
 
 
+
+
 sample_df = get_input(config["inputdir"])
 
 
@@ -84,7 +86,11 @@ sample_df = get_input(config["inputdir"])
 
 rule all:
 	input:
-		agg_csv="output/mutation_table_aggregate.csv",
+		agg_csv="output/mutation_table_aggregate.csv"
+	output:
+		"output/done.txt"
+	shell:
+		'find output -name "*.bam" -exec rm {{}} \; ; touch {output}'
 
 
 
@@ -99,7 +105,7 @@ checkpoint getgenebam:
 		genelist="assets/2697049_genelist.csv",
 		output_dir="output/haplotype/{sample}/"
 	shell:
-		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample}  -b {input.bam} -g {params.genelist} -o {params.output_dir} "
+		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample}  -b {input.bam} -g {params.genelist} -o {params.output_dir}  "
 
 
 rule getgenebam_agg:
@@ -110,6 +116,15 @@ rule getgenebam_agg:
 		"output/{sample}_haplotypes.txt"
 	shell:
 		"touch {output}"
+
+
+rule getgenebam_mark:
+	input:
+		bam="output/haplotype/{sample}/{gene}.bam"
+	output:
+		bam=temporary("output/haplotype/{sample}/{gene}.bam")
+	shell:
+		"touch {output.bam}"
 
 
 rule subsample_genebam:
