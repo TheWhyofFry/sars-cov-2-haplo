@@ -27,6 +27,12 @@ Create a folder called "inputdir" in the path containing the Snakemake file and 
 
 `snakemake -j 4 -p --config inputdir=inputdir -k`
 
+You can also subset to a gene/list of genes 
+
+`snakemake -j 4 -p --config inputdir=inputdir genes=S,ORF1b`
+
+Will subset the analysis to the listed genes - _case sensitive_.
+
 
 # Output
 
@@ -47,6 +53,7 @@ This pipeline makes use of various existing tools with intermediate scripts that
 ## Pipeline process:
 
 1. Split BAMs into individual gene bams
+	- Genes with coverage < 50% will be removed from subsequent analysis.  This "fixes" the CliqueSNV error where the gene coverage is too sparse
 2. Downsample the BAMs by _depth_.  Rather than using a proportional downsample as one can do with `samtools` and others, there is rather an upper limit of the depth of the BAMs.  This downsampling/depth clipping expidites the haplotype calling process.
 3. Haplotype imputation with CliqueSNV.  CliqueSNV is a rather new tool and as of writing still in the process of peer-review.  Nevertheless, it has been independently evaluated. 
 	- Side note: Any gene with a too-small coverage will be excluded from subsequent steps
