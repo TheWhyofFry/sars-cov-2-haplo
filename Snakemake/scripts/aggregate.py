@@ -25,8 +25,12 @@ if __name__ == "__main__":
             pass
     #print("CSVlist len:",len(csv_list))
 
-    p = pd.concat(csv_list,axis=0)
-    #print(p)
-    p.to_csv(args.outfile)
+    try:
+        p = pd.concat(csv_list,axis=0)
+        p.to_csv(args.outfile)
+    else:
+        with open(args.outfile,"w") as empty_file:
+            empty_file.write("")
+
 
 

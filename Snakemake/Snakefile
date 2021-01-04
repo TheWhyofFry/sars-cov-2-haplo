@@ -65,10 +65,9 @@ def get_genes(wildcards):
 	haplotype_info = pd.read_csv("output/haplotype/{sample}/{sample}_haplotype_info.txt".format(sample=wildcards.sample))
 	#haplotype_info[haplotype_info["pass"] == True]
 	haplotype_info = haplotype_info[haplotype_info.reads > 50]
+	
+	gene = haplotype_info.gene.values
 
-	gene = glob_wildcards(os.path.join("output/haplotype",wildcards.sample,"{gene}.bam")).gene
-	gene = [g for g in gene if (not "downsample" in g)]
-	gene = list(set(gene).intersection(haplotype_info.gene.values))
 	return gene
 	
 
@@ -234,7 +233,7 @@ rule virulign_agg:
 		
 
 	output:
-		vlign=temporary("output/{sample}_virulign.txt"),
+		virulign=temporary("output/{sample}_virulign.txt"),
 		agg_csv="output/mutation_tables_agg/{sample}_mutation_table_aggregate.csv"
 		
 	params:
@@ -242,7 +241,7 @@ rule virulign_agg:
 		
 	
 	shell:
-		"touch {output};"
+		"touch {output.virulign};"
 		"python3 scripts/aggregate.py -c {input.genes} -o {output.agg_csv}"
 
 rule muttable_agg:
