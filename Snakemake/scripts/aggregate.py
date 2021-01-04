@@ -9,14 +9,14 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-c", dest="filelist", nargs="+", default=["nothing"],help="Input list of csvs")
+    parser.add_argument("-c", dest="filelist", nargs="?", const="nothing",help="Input list of csvs")
     parser.add_argument("-o", dest="outfile", help="Output filename")
 
 
     args = parser.parse_args()
 
 
-    if "nothing" in args.filelist:
+    if "nothing" == args.filelist:
         with open(args.outfile,"w") as empty_file:
             empty_file.write("")
         sys.exit(0)
