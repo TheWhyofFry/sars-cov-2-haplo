@@ -107,6 +107,7 @@ def get_input(inputdir):
 
 sample_df = get_input(config["inputdir"])
 
+sample_df.to_csv("./sampledf.csv")
 
 rule all:
 	input:
