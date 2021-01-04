@@ -144,13 +144,6 @@ rule getgenebam_agg:
 		"touch {output}"
 
 
-rule getgenebam_mark:
-	input:
-		bam="output/haplotype/{sample}/{gene}.bam"
-	output:
-		bam=temporary("output/haplotype/{sample}/{gene}.bam")
-	shell:
-		"touch {output.bam}"
 
 
 rule subsample_genebam:
@@ -243,7 +236,7 @@ rule virulign_agg:
 		
 	
 	run:
-		if input.genes is not None:
+		if "genes" in input:
 			shell("touch {output.virulign}")
 			shell("python3 scripts/aggregate.py -c {input.genes} -o {output.agg_csv}")
 		else:
