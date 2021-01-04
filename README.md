@@ -1,7 +1,7 @@
-# SARS-CoV-2 
+# SARS-CoV-2 haplotype reconstructor 
 
 This repo contains a Snakemake file that will take in a bunch of BAM files,
-impute and extract putative hapoltypes and run the result through Virulign. 
+impute and extract putative hapoltypes with CliqueSNV and run the result through Virulign. 
 
 Please note that it assumes there is 100% concordance between the positions in your BAM
 with those in the [reference SARS-CoV-2 genome](https://www.ncbi.nlm.nih.gov/nuccore/NC_045512).
