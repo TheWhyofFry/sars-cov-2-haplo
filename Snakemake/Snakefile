@@ -240,10 +240,14 @@ rule virulign_agg:
 	
 	run:
 		shell("touch {output.virulign}")
-		if "genes" in input:
+		print("Input:",input.keys())
+		if "genes" in input.keys():
+			print("genes in output")
 			shell("touch {output.virulign}")
+				
 			shell("python3 scripts/aggregate.py -c {input.genes} -o {output.agg_csv}")
 		else:
+			print("genes NOT in output")
 			shell("touch {output.agg_csv}")
 
 
