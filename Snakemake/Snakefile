@@ -240,9 +240,13 @@ rule virulign_agg:
 		agg_csv="output/{sample}_mutation_table_aggregate.csv"
 		
 	
-	shell:
-		"touch {output.virulign};"
-		"python3 scripts/aggregate.py -c {input.genes} -o {output.agg_csv}"
+	run:
+		if input.genes is not None:
+			shell("touch {output.virulign}")
+			shell("python3 scripts/aggregate.py -c {input.genes} -o {output.agg_csv}")
+		else:
+			shell("touch {output.agg_csv}")
+
 
 rule muttable_agg:
 	input:
