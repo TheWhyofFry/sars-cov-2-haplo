@@ -3,18 +3,23 @@ import argparse
 
 import pandas as pd
 
+import sys
 
 if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-c", dest="filelist", nargs="+", help="Input list of csvs")
+    parser.add_argument("-c", dest="filelist", nargs="+", default=["nothing"],help="Input list of csvs")
     parser.add_argument("-o", dest="outfile", help="Output filename")
 
 
     args = parser.parse_args()
 
 
+    if "nothing" in args.filelist:
+        with open(args.outfile,"w") as empty_file:
+            empty_file.write("")
+        sys.exit(0)
     csv_list = []
 
     for filename in args.filelist:
