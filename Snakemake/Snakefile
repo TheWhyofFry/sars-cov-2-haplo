@@ -239,6 +239,7 @@ rule virulign_agg:
 		
 	
 	run:
+		shell("touch {output.virulign}")
 		if "genes" in input:
 			shell("touch {output.virulign}")
 			shell("python3 scripts/aggregate.py -c {input.genes} -o {output.agg_csv}")
