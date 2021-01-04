@@ -67,8 +67,10 @@ def get_genes(wildcards):
 	haplotype_info = haplotype_info[haplotype_info.reads > 50]
 	
 	gene = haplotype_info.gene.values
-
-	return gene
+	if len(gene) == 0:
+		return None
+	else:
+		return gene
 	
 
 def get_input(inputdir):
