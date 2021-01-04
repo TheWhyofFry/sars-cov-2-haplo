@@ -34,11 +34,24 @@ if __name__ == "__main__":
 
     reads_base = [0.] * len(genelist.gene)
     coords_df = genelist.copy()
+    
+    bamfile = pysam.AlignmentFile(args.bam,mode="r")
+    with StringIO(pysam.depth(bamfile)) as sio:
+            depth_df = pd.read_table(sio, header=None, names=["ref","pos","depth"], sep="\t")
+    
     for i, row in genelist.iterrows():
         
         gene = row.gene
-        bamfile = pysam.AlignmentFile(args.bam,mode="r")
 
+
+        depth_pass = len(depth_df[(depth_df.pos >= row.start) & (depth_df.pos <= row.end) & (depth_df.depth > 0)])
+
+        gene_length = (row.end - row.start) + 1
+
+        depth_frac = depth_pass / float(gene_length)
+
+
+        
         reference = bamfile.references[0]
         #outfile = "{prefix}.bam"
         output_filename = os.path.join(args.output_folder, "%s.bam"%(gene))
@@ -61,7 +74,8 @@ if __name__ == "__main__":
         #print("Num reads:", num_reads)
         reads[i] = num_reads
         if os.path.exists(output_filename):
-            passed[i] = True
+            if depth_frac > 0.50:
+                passed[i] = True
         reads_base[i] = round(num_reads/float(row.end-row.start+1))
 
     print("Reads:",reads)
