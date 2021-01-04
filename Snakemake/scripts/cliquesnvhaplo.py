@@ -11,6 +11,8 @@ import numpy as np
 import os
 import subprocess
 
+from io import StringIO
+
 import pysam
 import argparse
 
@@ -36,7 +38,7 @@ if __name__ == "__main__":
     coords_df = genelist.copy()
     
     bamfile = pysam.AlignmentFile(args.bam,mode="r")
-    with StringIO(pysam.depth(bamfile)) as sio:
+    with StringIO(pysam.depth(args.bam)) as sio:
             depth_df = pd.read_table(sio, header=None, names=["ref","pos","depth"], sep="\t")
     
     for i, row in genelist.iterrows():

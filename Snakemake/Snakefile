@@ -8,10 +8,28 @@ from io import StringIO
 
 import pysam
 
-sarscov2_genelist = "assets/2697049_genelist.csv"
+sarscov2_genelist_initial = "assets/2697049_genelist.csv"
 
 
-genelist_df = pd.read_csv(sarscov2_genelist).set_index("gene", drop=False)
+genelist_df = pd.read_csv(sarscov2_genelist_initial).set_index("gene", drop=False)
+
+
+if "genes" in config:
+	gene_list = config["genes"].split(",")
+else:
+	gene_list = genelist_df.gene.values
+
+
+genelist_df = genelist_df[genelist_df.gene.isin(gene_list)]
+
+genelist_df.to_csv("assets/2697049_genelist_filtered.csv",index=False)
+
+print(genelist_df)
+
+sarscov2_genelist = "assets/2697049_genelist_filtered.csv"
+
+
+
 
 def cliquesnv_coords(genelist, genename, sample):
 	
@@ -58,30 +76,36 @@ def get_input(inputdir):
 	
 	bam_files = glob("%s/*.bam"%inputdir)
 	basenames = list(map(os.path.basename, bam_files))
-	print(basenames)
-	try:
-		max_delim = min(map(lambda x:x.count("_"), basenames))
-	except ValueError:
-		max_delim = 0
+	
+	bam_files_ref = pd.Series(bam_files, index=basenames)
+	delim_df = pd.DataFrame.from_records([(basename, basename.count("_"),) for basename in basenames], columns=["basename","delim_count"])
+		
+	out_df_list = []
+	
+	for c, df in delim_df.groupby("delim_count"):
+		if c == 0:
+			out_df_list.append(pd.DataFrame(dict(samplename=df.basename.apply(lambda x:x.replace(".bam","")).values,
+							     fielname=bam_files_ref[df.basename.values].values)))
+			continue
 
-	if max_delim == 0:
-		s = pd.Series([n.replace(".bam","") for n in basenames])
-	for i in range(max_delim):
-		s = pd.Series(map(lambda x:"_".join(x.split("_")[:(i+1)]), basenames))
-		l = len(s)
+		for i in range(c):
+			s = pd.Series(map(lambda x:"_".join(x.split("_")[:(i+1)]), df.basename))
+			if len(s.drop_duplicates()) == len(s):
+				out_df_list.append(pd.DataFrame(dict(samplename=s.values, filename=bam_files_ref[df.basename.values].values)))
+				break
+
 			
-		if len(s.drop_duplicates()) == l:
-			break
 
-	return pd.DataFrame(dict(samplename=s.values, filename=bam_files)).set_index("samplename",drop=False)
+
+
+	return pd.concat(out_df_list).set_index("samplename",drop=False)
+	#return pd.DataFrame(dict(samplename=s.values, filename=bam_files)).set_index("samplename",drop=False)
 
 
 
 
 
 sample_df = get_input(config["inputdir"])
-
-
 
 
 rule all:
@@ -102,7 +126,7 @@ checkpoint getgenebam:
 	output:
 		haplotype_info="output/haplotype/{sample}/{sample}_haplotype_info.txt",
 	params:
-		genelist="assets/2697049_genelist.csv",
+		genelist=sarscov2_genelist,
 		output_dir="output/haplotype/{sample}/"
 	shell:
 		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample}  -b {input.bam} -g {params.genelist} -o {params.output_dir}  "
