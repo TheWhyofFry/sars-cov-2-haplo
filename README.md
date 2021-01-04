@@ -19,6 +19,8 @@ The following modules are needed:
   - samtools
   - [virulign](https://github.com/rega-cev/virulign) 
 
+I've included some tools necessary for the pipeline (under Snakemake/tools).  The CliqueSNV version is 1.5.6, BUT I modified a bit of the source - nothing in the algorithm.  Please only use the version on the repo.
+
 
 # Running example 
 
