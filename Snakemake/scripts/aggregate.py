@@ -9,7 +9,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("-c", dest="filelist", nargs="?", const="nothing",help="Input list of csvs")
+    parser.add_argument("-c", dest="filelist", nargs="+", help="Input list of csvs")
     parser.add_argument("-o", dest="outfile", help="Output filename")
 
 
