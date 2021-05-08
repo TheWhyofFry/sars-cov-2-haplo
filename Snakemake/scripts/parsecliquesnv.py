@@ -69,7 +69,7 @@ if __name__ == "__main__":
 
             start, end = match.start(), match.end()
 
-            seq_arr[start:(end+1)] = ["N"]*(end-start+1)
+            seq_arr[start:(end)] = ["N"]*(end-start)
         
         seq = "".join(seq_arr) 
         out_fasta += ">%s\n%s\n"%(header, seq)
