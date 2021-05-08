@@ -116,10 +116,32 @@ rule all:
 
 
 
-checkpoint getgenebam:
+rule dedupbam:
 	input:
 		bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename,
 		bai=lambda wildcards: "{bam}.bai".format(bam=sample_df.loc[wildcards.sample,].filename)
+		
+	output:
+		BAM=temporary("output/bam.dedup/{sample}.bam"),
+		M="output/dedup.metrics/{sample}.txt"
+
+	shell:
+		"picard MarkDuplicates I={input.bam} O={output.BAM} M={output.M} --CREATE_INDEX"
+	
+
+rule lofreqviterbi:
+	input:
+		bam="output/bam.dedup/{sample}.bam"
+	output:
+		bam="output/bam.dedup/{sample}.viterbi.bam"
+	shell:
+		"lofreq -f assets/NC_045512.3.fasta {input.bam} | samtools sort -o {output}"  
+
+checkpoint getgenebam:
+	input:
+		#bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename,
+		#bai=lambda wildcards: "{bam}.bai".format(bam=sample_df.loc[wildcards.sample,].filename)
+		bam="output/bam.dedup/{sample}.viterbi.bam"
 
 	output:
 		haplotype_info="output/haplotype/{sample}/{sample}_haplotype_info.txt",
