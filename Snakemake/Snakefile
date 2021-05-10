@@ -126,7 +126,7 @@ rule dedupbam:
 		M="output/dedup.metrics/{sample}.txt"
 
 	shell:
-		"picard MarkDuplicates I={input.bam} O={output.BAM} M={output.M} --CREATE_INDEX"
+		"picard MarkDuplicates I={input.bam} O={output.BAM} M={output.M}"
 	
 
 rule lofreqviterbi:
@@ -135,7 +135,8 @@ rule lofreqviterbi:
 	output:
 		bam="output/bam.dedup/{sample}.viterbi.bam"
 	shell:
-		"lofreq viterbi -f assets/NC_045512.3.fasta {input.bam} | samtools sort -o {output}"  
+		"lofreq viterbi -f assets/NC_045512.3.fasta {input.bam} | samtools sort -o {output} && "
+		"samtools index {output}"  
 
 checkpoint getgenebam:
 	input:

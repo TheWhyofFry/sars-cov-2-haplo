@@ -355,7 +355,9 @@ def mafft_wrapper(input_fasta, options="--localpair", tmp_dir="/tmp"):
     return stdout
 
 def reorder_fasta(fasta_list, reorder_dict):
-
+    
+    if len(fasta_list) == 1:
+        return fasta_list
     alignments_ = [True] * len(fasta_list)
 
     for i, (title,seq) in enumerate(fasta_list):
@@ -465,7 +467,7 @@ if __name__ == "__main__":
     if len(final_alignments_aa) > 0:
         with open(args.output_fasta_aa, "w") as ofile_aa:
             
-            s = mafft_wrapper([reference_aa]+fasta_alignments_aa)
+            s = mafft_wrapper([reference_aa]+final_alignments_aa)
             ofile_aa.write(s)
 
         with open(args.output_fasta_nt, "w") as ofile_nt:
