@@ -135,7 +135,7 @@ rule lofreqviterbi:
 	output:
 		bam="output/bam.dedup/{sample}.viterbi.bam"
 	shell:
-		"lofreq -f assets/NC_045512.3.fasta {input.bam} | samtools sort -o {output}"  
+		"lofreq viterbi -f assets/NC_045512.3.fasta {input.bam} | samtools sort -o {output}"  
 
 checkpoint getgenebam:
 	input:
