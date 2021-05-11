@@ -1,0 +1,9 @@
+*.pyc
+*pycache*
+inputdir*/
+Snakemake/assets/2697049_genelist_filtered.csv
+*.swo
+*.swp
+*.snakemake
+sampledf.csv
+Snakemake/output*
