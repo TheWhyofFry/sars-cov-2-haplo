@@ -340,12 +340,14 @@ def write_fasta(fasta_list, fasta_file):
     return
 
 
-def mafft_wrapper(input_fasta, options="--localpair", tmp_dir="/tmp"):
+def mafft_wrapper(input_fasta_, options="--localpair", tmp_dir="/tmp"):
     
     num, tmpfasta = tempfile.mkstemp(prefix="mafft", suffix=".fasta", dir=tmp_dir)
-
+    print(input_fasta_)
     with open(tmpfasta, "w") as ofile:
-        for title, seq in input_fasta:
+        for i, (title, seq) in enumerate(input_fasta_):
+            
+            print("Title:",title,i)
             ofile.write(">%s\n%s\n"%(title,seq))
 
     MAFFT_COMMAND = "mafft {options} {input}".format(options=options, input=tmpfasta)
@@ -356,12 +358,12 @@ def mafft_wrapper(input_fasta, options="--localpair", tmp_dir="/tmp"):
 
 def reorder_fasta(fasta_list, reorder_dict):
     
-    if len(fasta_list) == 1:
+    if len(fasta_list) <= 1:
         return fasta_list
     alignments_ = [True] * len(fasta_list)
-
     for i, (title,seq) in enumerate(fasta_list):
-        alignments_[reorder_dict[title]] = fasta_list[i]
+        print("I:",i)
+        alignments_[reorder_dict[title]-1] = (title, seq,)
 
     return alignments_
 
@@ -471,6 +473,7 @@ if __name__ == "__main__":
             ofile_aa.write(s)
 
         with open(args.output_fasta_nt, "w") as ofile_nt:
+            print("L:",len(reference_nt), len(final_alignments_nt))
             s = mafft_wrapper([reference_nt]+final_alignments_nt)
             ofile_nt.write(s)
 
