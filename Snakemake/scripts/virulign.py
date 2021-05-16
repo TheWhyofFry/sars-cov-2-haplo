@@ -27,8 +27,8 @@ import pandas as pd
 import math
 from runcommand import run_output
 import agagen
-
-
+import re
+import pathlib
 
 def remap(seq):
 
@@ -340,14 +340,12 @@ def write_fasta(fasta_list, fasta_file):
     return
 
 
-def mafft_wrapper(input_fasta_, options="--localpair", tmp_dir="/tmp"):
+def mafft_wrapper(input_fasta, options="--localpair", tmp_dir="/tmp"):
     
     num, tmpfasta = tempfile.mkstemp(prefix="mafft", suffix=".fasta", dir=tmp_dir)
-    print(input_fasta_)
+
     with open(tmpfasta, "w") as ofile:
-        for i, (title, seq) in enumerate(input_fasta_):
-            
-            print("Title:",title,i)
+        for title, seq in input_fasta:
             ofile.write(">%s\n%s\n"%(title,seq))
 
     MAFFT_COMMAND = "mafft {options} {input}".format(options=options, input=tmpfasta)
@@ -356,17 +354,36 @@ def mafft_wrapper(input_fasta_, options="--localpair", tmp_dir="/tmp"):
 
     return stdout
 
-def reorder_fasta(fasta_list, reorder_dict):
-    
-    if len(fasta_list) <= 1:
-        return fasta_list
-    alignments_ = [True] * len(fasta_list)
-    for i, (title,seq) in enumerate(fasta_list):
-        print("I:",i)
-        alignments_[reorder_dict[title]-1] = (title, seq,)
 
-    return alignments_
+def viruligndf(fasta_entries):
 
+    print([(title,seq[:20]) for title,seq in fasta_entries]) 
+    name, ref = fasta_entries[0]
+
+    name = name.split(" ")[0]    
+    current_pos = 0
+    within_insertion = False
+
+
+    columns_seq = []
+    for aa in ref:
+        if aa != '-':
+            current_pos += 1
+        
+        columns_seq.append("%s_%s"%(name, current_pos))
+
+    for f in re.finditer("-+",ref):
+        start, end = f.span()
+        columns_seq[start:end] = ["%sins%s"%(c,i+1) for i,c in enumerate(columns_seq[start:end])]
+
+    df_seq = pd.DataFrame(map(list,[r[1] for r in fasta_entries]),columns=columns_seq)
+
+    df_name = pd.DataFrame(dict(seqid=[r[0] for r in fasta_entries]))
+
+    df = pd.concat([df_name, df_seq], axis=1)
+
+
+    return df
 
 if __name__ == "__main__":
     import argparse
@@ -377,6 +394,7 @@ if __name__ == "__main__":
     parser.add_argument("-i", type=str, dest="input_fasta", help="Input FASTA file")
     parser.add_argument("-n", type=str, dest="output_fasta_nt", help="Output FASTA file (nuc)")
     parser.add_argument("-a", type=str, dest="output_fasta_aa", help="Output FASTA file (aa)")
+    parser.add_argument("-c", type=str, dest="output_csv_aa", help="Output CSV  file (aa - virulign positional table output)")
     parser.add_argument("-r", type=str, dest="virulign_ref_file", help="Initial Virulign reference file")
     #parser.add_argument("-b", type=str, dest="blastn", help="BLASTN DB", default="")
     #parser.add_argument("-B", type=str, dest="blastp", help="BLASTP DB", default="")
@@ -391,12 +409,6 @@ if __name__ == "__main__":
     # Intial FASTA
 
     fasta_initial = read_fasta(args.input_fasta)
-
-    fasta_order = dict([(title, i+1) for i, (title,seq) in enumerate(fasta_initial)])
-
-
-    
-
     n_query = len(fasta_initial)
 
     # Initial alignment
@@ -422,16 +434,13 @@ if __name__ == "__main__":
     temp_alignments_nt = []
     n_missing_entries = len(missing_entries)
     
-    print("Missing entries:", n_missing_entries)
 
     if n_missing_entries > 0:
         code, missing_entries_file = tempfile.mkstemp(prefix="virulign-tools", suffix=".fasta",dir="/tmp")
-        print("MISSING ENTRY FILE:", missing_entries_file, code)
         write_fasta(missing_entries, missing_entries_file)
 
             
         gb = agagen.create_aga_gb(reference_nt[1].replace("-","").replace(".",""), prot=reference_nt[0])
-
         aga_alignments_nt = []
         aga_alignments_aa = []
 
@@ -449,8 +458,6 @@ if __name__ == "__main__":
 
             aga_alignments_nt.extend(nt_align)
             aga_alignments_aa.extend(aa_align)
-            print("Current recovered:")
-            print([title for seq, title in aa_align])
             temp_alignments_aa.extend(aa_align)
             temp_alignments_nt.extend(nt_align)
 
@@ -463,24 +470,32 @@ if __name__ == "__main__":
     print("AGA RECOVERED:")
     print([title for title,seq in temp_alignments_aa])
     final_alignments_aa = fasta_initial_alignment_aa + temp_alignments_aa
-    final_alignments_nt = reorder_fasta(fasta_initial_alignment_nt + temp_alignments_nt, fasta_order)
-    
+    final_alignments_nt = fasta_initial_alignment_nt + temp_alignments_nt
 
     if len(final_alignments_aa) > 0:
         with open(args.output_fasta_aa, "w") as ofile_aa:
-            
             s = mafft_wrapper([reference_aa]+final_alignments_aa)
             ofile_aa.write(s)
 
         with open(args.output_fasta_nt, "w") as ofile_nt:
-            print("L:",len(reference_nt), len(final_alignments_nt))
             s = mafft_wrapper([reference_nt]+final_alignments_nt)
             ofile_nt.write(s)
 
         print("Wrote %s AA sequences and %s NT sequences:"%(len(fasta_initial_alignment_nt), len(fasta_initial_alignment_aa)))
+    
+    #:virulign_df_nt = viruligndf([reference_nt] + final_alignments_nt)
+    print(reference_aa)
+    try:
+        virulign_aa = read_fasta(args.output_fasta_aa)
+        virulign_df_aa = viruligndf(virulign_aa)
+        virulign_df_aa.to_csv(args.output_csv_aa, index=False)
+    except FileNotFoundError:
+        pathlib.Path(args.output_csv_aa).touch()
+        pathlib.Path(args.output_fasta_aa).touch()
+        pathlib.Path(args.output_fasta_nt).touch()
 
     if len(missing_entries) > 0:
-        print("Some sequences could not be aligned: "%("\n".join([title for title,seq in missing_entries])))
+        print("Some sequences could not be aligned: \n %s"%("\n".join([title for title,seq in missing_entries])))
 
     
 
