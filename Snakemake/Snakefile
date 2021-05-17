@@ -42,21 +42,9 @@ def cliquesnv_coords(genelist, genename, sample):
 	# the start/stop positions accordingly
 
 	bam = "output/haplotype/{sample}/{gene}.bam".format(gene=genename, sample=sample)
-	with StringIO(pysam.depth(bam)) as sio:
-		depth_df = pd.read_table(sio, header=None, names=["ref","pos","depth"], sep="\t")
-		depth_df = depth_df[depth_df.depth > 5]
-
 	
-	start = max([start, depth_df.pos.min()])
-	end   = min([end, depth_df.pos.max()])
-	
-
-
 	command_str = " -sp {start} -ep {end} -os {start} -oe {end} ".format(start=start-1, end=end-1)
-
-
-		
-
+	
 	return command_str
 
 def get_genes(wildcards):
