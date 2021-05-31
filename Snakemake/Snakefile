@@ -37,10 +37,6 @@ def cliquesnv_coords(genelist, genename, sample):
 
 	start, end = gene.start, gene.end
 
-	# Dumb thing with cliquesnv if the specified boundaries have less then 3 depth
-	# So we check the minimum/max positions that have coverage and adjust 
-	# the start/stop positions accordingly
-
 	bam = "output/haplotype/{sample}/{gene}.bam".format(gene=genename, sample=sample)
 	
 	command_str = " -sp {start} -ep {end} -os {start} -oe {end} ".format(start=start-1, end=end-1)
@@ -84,7 +80,6 @@ def get_input(inputdir):
 
 
 	return pd.concat(out_df_list).set_index("samplename",drop=False)
-	#return pd.DataFrame(dict(samplename=s.values, filename=bam_files)).set_index("samplename",drop=False)
 
 
 
@@ -128,8 +123,6 @@ rule lofreqviterbi:
 
 checkpoint getgenebam:
 	input:
-		#bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename,
-		#bai=lambda wildcards: "{bam}.bai".format(bam=sample_df.loc[wildcards.sample,].filename)
 		bam="output/bam.dedup/{sample}.viterbi.bam"
 
 	output:
@@ -178,7 +171,6 @@ rule cliquesnv:
 	input:
 		gene_bam="output/haplotype/{sample}/{gene}.downsample.bam",
 		gene_orig_bam="output/haplotype/{sample}/{gene}.bam"
-		#gene_bam=rules.subsample_genebam.output.bam
 	output:
 		cliquesnv="output/haplotype/{sample}/{gene}.downsample.fasta"
 	params:
