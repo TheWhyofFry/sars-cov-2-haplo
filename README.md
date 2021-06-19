@@ -18,6 +18,7 @@ The following modules are needed:
 2. General:
   - samtools
   - [virulign](https://github.com/rega-cev/virulign) 
+  - [cliquesnv](https://github.com/vtsyvina/CliqueSNV/archive/refs/tags/1.5.7.tar.gz)
 
 I've included some tools necessary for the pipeline (under Snakemake/tools), except CliqueSNV.  The version the pipeline was tested on, is CliqueSNV 1.5.7. CliqueSNV is under active development, so if something fails with a new version, please open an issue/try the aforementioned version.
 
@@ -64,9 +65,7 @@ This pipeline makes use of various existing tools with intermediate scripts that
 
 ## Notes:
 
-For any alignment containing an unknown AA (either by lack of coverage/frameshift error in the alignment), will be masked with X.  This is because virulign performs a global alignment, but strips the gaps beforehand. For the sake of being conservative, any stretch of deletions longer than 12 (by default) will be masked with Ns and as a consequence, the reference AAs in those regions will be used. This could be changed, of course, to longer stretches.   
-
-
+For any alignment containing an unknown AA (either by lack of coverage/frameshift error in the alignment), will be masked with X.  This is because virulign performs a global alignment, but strips the gaps beforehand. Newer versions of CliqueSNV marks sites with zero coverage with "N".
 
 
 
