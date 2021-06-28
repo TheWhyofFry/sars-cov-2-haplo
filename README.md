@@ -19,6 +19,7 @@ The following modules are needed:
   - samtools
   - [virulign](https://github.com/rega-cev/virulign) 
   - [cliquesnv](https://github.com/vtsyvina/CliqueSNV/archive/refs/tags/1.5.7.tar.gz)
+  - [AGA](https://github.com/emweb/aga)
 
 I've included some tools necessary for the pipeline (under Snakemake/tools), except CliqueSNV.  The version the pipeline was tested on, is CliqueSNV 1.5.7. CliqueSNV is under active development, so if something fails with a new version, please open an issue/try the aforementioned version.
 

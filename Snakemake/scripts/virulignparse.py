@@ -116,12 +116,18 @@ def get_muts(v):
      
      return vf
 
-def splitseqid(v):
+def splitseqid(v, fakeit=False):
 
-    v = pd.concat([v, v.seqid.str.split("/",expand=True).rename(columns={0:"samplename",1:"haplonum",2:"prop"})],axis=1)
-    
-    v["prop"] = v["prop"].astype(np.float)
-    return v
+    if not fakeit:
+        _v = pd.concat([v, v.seqid.str.split("/",expand=True).rename(columns={0:"samplename",1:"haplonum",2:"prop"})],axis=1)
+        
+        _v["prop"] = _v["prop"].astype(np.float)
+    else:
+        _v = v
+        _v["samplename"] = v.seqid.values
+        _v["haplonum"] = "0"
+        _v["prop"] = 0.0
+    return _v
         
 
 def aggregate_muts(v):
@@ -142,7 +148,7 @@ if __name__ == "__main__":
     parser.add_argument("-n", dest="normalfile", help="Normal table output file")
     parser.add_argument("-m", dest="mutaggfile", help="Aggregated mutation file")
     parser.add_argument("-a", dest="aggfile", help="Aggregated residue file")
-
+    parser.add_argument("-s", dest="fakeit", action="store_true", help="Skip parsing of headers")
 
     args = parser.parse_args()
 
@@ -157,7 +163,7 @@ if __name__ == "__main__":
                 ofile.close()
         sys.exit(0)
 
-    y = repairseq(splitseqid(v.virulign_df_m), ref_seq).sort_values(["gene","pos","prop"],ascending=[True,True,False])
+    y = repairseq(splitseqid(v.virulign_df_m, fakeit=args.fakeit), ref_seq).sort_values(["gene","pos","prop"],ascending=[True,True,False])
 
     agg = y.groupby(["samplename","gene","pos","new_aa"]).aggregate({"prop":sum, "haplonum":lambda x: "/".join(x)}).reset_index().sort_values(["samplename","gene","pos","prop"],ascending=[True,True,True,False])
 
