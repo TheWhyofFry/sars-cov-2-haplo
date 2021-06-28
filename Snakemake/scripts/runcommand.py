@@ -10,5 +10,5 @@ def run_output(command):
     stdout = stdout.decode('utf-8').replace("\\n","\n")
     stderr = stderr.decode('utf-8').replace("\\n","\n")
     returncode = proc.returncode
-    
+    proc.close()    
     return stdout, stderr, returncode
