@@ -1,8 +1,6 @@
 # SARS-CoV-2 haplotype reconstructor 
 
-> Why are you doing this? There are only like 20 mutations - _Tulio de Oliveira_
 
-Why indeed! ;)
 
 This repo contains a Snakemake file that will take in a bunch of BAM files,
 impute and extract putative hapoltypes with CliqueSNV and run the result through Virulign. 
