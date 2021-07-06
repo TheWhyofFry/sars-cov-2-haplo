@@ -219,8 +219,8 @@ rule virulign:
 		"output/haplotype/{sample}/{gene}.fasta"
 
 	output:
-		nt_alignment="output/virulign/gene/{sample}_{gene}_nt.fasta",
-		aa_alignment="output/virulign/gene/{sample}_{gene}_aa.fasta",
+		nt_alignment="output/virulign/{gene}/{sample}_{gene}_nt.fasta",
+		aa_alignment="output/virulign/{gene}/{sample}_{gene}_aa.fasta",
 		csv="output/virulign/{gene}/{sample}.csv"
 	
 	params: 
