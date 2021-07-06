@@ -3,6 +3,8 @@ import argparse
 from runcommand import run_output
 
 import tempfile 
+import psutil
+import contextlib
 
 
 """
@@ -11,6 +13,11 @@ import tempfile
                      /transl_table="1"
                      /protein_id="env"
 """
+
+def mkstemp(*args, **kwargs):
+    fd, pathname = tempfile.mkstemp(*args, **kwargs)
+    os.close(fd)
+    return pathname
 
 def create_aga_gb(seq, prot):
 
@@ -34,18 +41,19 @@ def create_aga_gb(seq, prot):
 # input_seq = (title, seq) or fasta seq
 def run_aga(input_seq, genbank_str=None, genbank_file=None, tmp_dir="/tmp",file_prefix="agawrapper", delete_temp=True):
     
-    ALIGNMENT = tempfile.mkstemp(prefix="alignment", suffix=".fasta",dir=tmp_dir)[1]
-    NT        = tempfile.mkstemp(prefix="nt", suffix=".fasta", dir=tmp_dir)[1]
-    AA        = tempfile.mkstemp(prefix="aa", suffix=".fasta", dir=tmp_dir)[1]
-    INPUT     = tempfile.mkstemp(prefix="input", suffix=".fasta", dir=tmp_dir)[1]
-    GENBANK   = tempfile.mkstemp(prefix="genbank",suffix=".gb", dir=tmp_dir)[1]
+    ALIGNMENT = mkstemp(prefix="alignment", suffix=".fasta",dir=tmp_dir)
+    NT        = mkstemp(prefix="nt", suffix=".fasta", dir=tmp_dir)
+    AA        = mkstemp(prefix="aa", suffix=".fasta", dir=tmp_dir)
+    INPUT     = mkstemp(prefix="input", suffix=".fasta", dir=tmp_dir)
+    GENBANK   = mkstemp(prefix="genbank",suffix=".gb", dir=tmp_dir)
     if type(input_seq) is tuple:
         input_seq = ">%s\n%s\n"%input_seq
 
-    
     if genbank_str is not None:
         with open(GENBANK, "w") as ofile:
             ofile.write(genbank_str)
+            ofile.close()
+
     if genbank_file is not None:
         GENBANK = genbank_file
 

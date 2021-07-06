@@ -30,6 +30,11 @@ import agagen
 import re
 import pathlib
 
+import psutil
+
+proc = psutil.Process()
+
+
 def remap(seq):
 
     seq_nogaps = seq.replace("-","")
@@ -115,7 +120,7 @@ def blast(missing_entries, blast_db, blast_prog="blastn", other_options=""):
 
 
 
-def initial_alignment(fasta_file, virulign_ref_file, virulign_command="virulign",
+def initial_alignment(fasta_file, virulign_ref_file, virulign_command="virulignmp",
                       alphabet="AminoAcids", exportkind="GlobalAlignment",
                       exportwithref="yes", maxFrameShifts=3):
     
@@ -132,7 +137,7 @@ def initial_alignment(fasta_file, virulign_ref_file, virulign_command="virulign"
                                                                      maxFrameShifts=maxFrameShifts))
     # Fix that quirky case when arbitrary characters are written out by virulignmp
     if ">" in stdout:
-        #stdout = stdout[stdout.index(">"):]
+        stdout = stdout[stdout.index(">"):]
 
         with io.StringIO(stdout) as fasta_output:
             fasta_list = read_fasta(fasta_output)
@@ -340,7 +345,7 @@ def write_fasta(fasta_list, fasta_file):
     return
 
 
-def mafft_wrapper(input_fasta, options="--localpair", tmp_dir="/tmp"):
+def mafft_wrapper(input_fasta, options="--globalpair", tmp_dir="/tmp"):
     
     num, tmpfasta = tempfile.mkstemp(prefix="mafft", suffix=".fasta", dir=tmp_dir)
 
@@ -376,7 +381,7 @@ def viruligndf(fasta_entries):
         start, end = f.span()
         columns_seq[start:end] = ["%sins%s"%(c,i+1) for i,c in enumerate(columns_seq[start:end])]
 
-    df_seq = pd.DataFrame(map(list,[r[1] for r in fasta_entries]),columns=columns_seq)
+    df_seq = pd.DataFrame(list(map(list,[r[1] for r in fasta_entries])),columns=columns_seq)
 
     df_name = pd.DataFrame(dict(seqid=[r[0] for r in fasta_entries]))
 
@@ -396,11 +401,6 @@ if __name__ == "__main__":
     parser.add_argument("-a", type=str, dest="output_fasta_aa", help="Output FASTA file (aa)")
     parser.add_argument("-c", type=str, dest="output_csv_aa", help="Output CSV  file (aa - virulign positional table output)")
     parser.add_argument("-r", type=str, dest="virulign_ref_file", help="Initial Virulign reference file")
-    #parser.add_argument("-b", type=str, dest="blastn", help="BLASTN DB", default="")
-    #parser.add_argument("-B", type=str, dest="blastp", help="BLASTP DB", default="")
-    #parser.add_argument("-X", action='store_true', dest="do_blastx", help="If all else fails, align with BLASTX")
-    #parser.add_argument("-R", action='store_true', dest="do_selfref", help="Align failed sequences to sequences that passed first")
-    #parser.add_argument("-N", action='store_true', dest="do_blastn", help="Repeat alignment for failed sequences using the specified BLASTN DB")
     parser.add_argument("-s", type=int, dest="num_alignments", help="Number of blast alignments", default=20)
 
     
@@ -447,7 +447,7 @@ if __name__ == "__main__":
         for title,seq in missing_entries:
 
             aga = agagen.run_aga((title,seq,), genbank_str=gb, delete_temp=True)
-
+            print("Number of open files:", len(proc.open_files()))
             aa_align, nt_align, full_align = aga
 
             aa_align = agagen.extract_aligned_seqs(aa_align,title=title,full=False,replace_char="X")
@@ -500,83 +500,6 @@ if __name__ == "__main__":
     
 
 
-"""
-        blastn_fasta_entries = []
-
-        if (args.do_blastn):
-
-
-            # Get N hits from a blast db to try and use these seqs as reference
-            # Note that these are _valid_ references, i.e. seqs where virulign could resolve
-            # A fundamental reference sequence (e.g. HXB2 in HIV-1) with a query
-            # and WITHOUT any frame shift compensation
-
-            BLASTN = "blastn -db {db} -query {query} -num_alignments {n} -outfmt 6#qseqid#sseqid#bitscore".format(db=args.blastn,
-                                                                                                                    query=missing_entries_file,
-                                                                                                                    n=args.num_alignments)
-            print(BLASTN)
-            blastn_output, stderr, returncode = run_output(BLASTN)
-            with io.StringIO(blastn_output) as blastn_output_f:
-                blastn_df = pd.read_table(blastn_output_f,names=["qseqid", "sseqid", "bitscore"])
-                blast_hits = blastn_df.value_counts("sseqid").sort_values(ascending=False).reset_index().sseqid.values
-                print("BLAST HITS:")
-                blastn_entries, stderr, returncode = run_output('blastdbcmd -entry "{entry}" -db {db}'.format(entry=','.join(blast_hits),db=args.blastn))
-                
-                with io.StringIO(blastn_entries) as blast_file:
-                    blastn_fasta_entries = read_fasta(blast_file)
-                    print("BLASTN Entries:", blastn_fasta_entries)
-
-            
-
-
-
-        if (args.do_selfref) and (len(fasta_initial_alignment) > 1):
-            fasta_initial_alignment_ref = fasta_initial_alignment[:]
-        else:
-            fasta_initial_alignment_ref = []
-
-
-            
-
-
-
-
-
-
-
-
-            
-
-
-        
-        # Placeholder
-        rep = False
-        if rep:
-            print("Finding appropriate references ... ")
-            alternative_alignments = fasta_initial_alignment_ref + blastn_fasta_entries
-            print([title for title,seq in alternative_alignments])
-            for fasta_entry in alternative_alignments:
-                title, seq = fasta_entry
-                print(title)
-                secondary_alignment, missing_entries = do_secondary(missing_entries, fasta_entry, virulign_params=dict(alphabet="AminoAcids", exportwithref="no"))
-
-                if len(secondary_alignment) == 0:
-                    continue
-                
-                temp_alignments.extend(secondary_alignment)
-
-                n_missing_entries -= len(secondary_alignment)
-
-                if n_missing_entries == 0:
-                    break
-        if (n_missing_entries > 0) and (args.do_blasx):
-
-            blastx = blastx_align(missing_entries, args.blastp)
-
-            if len(blastx) > 1:
-                pass                    
-            pass
-"""
             
 
 

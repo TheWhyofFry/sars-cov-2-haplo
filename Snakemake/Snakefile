@@ -39,7 +39,7 @@ def cliquesnv_coords(genelist, genename, sample):
 
 	bam = "output/haplotype/{sample}/{gene}.bam".format(gene=genename, sample=sample)
 	
-	command_str = " -sp {start} -ep {end} -os {start} -oe {end} ".format(start=start-1, end=end-1)
+	command_str = " -sp {start} -ep {end} -os {start} -oe {end} ".format(start=start-1, end=end)
 	
 	return command_str
 
@@ -112,13 +112,27 @@ rule dedupbam:
 		"picard MarkDuplicates I={input.bam} O={output.BAM} M={output.M}"
 	
 
+rule genpseudoref:
+	input:
+		bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename
+	
+	params:
+		ref_fasta="assets/NC_045512.3.fasta"
+	output:
+		"output/tmp/{sample}.pseudoref.fasta"
+	shell:
+		"python scripts/pseudoref.py -i {params.ref_fasta} -b {input.bam} -o {output}"
+	
+
+
 rule lofreqviterbi:
 	input:
-		bam="output/bam.dedup/{sample}.bam"
+		bam="output/bam.dedup/{sample}.bam",
+		pseudoref=rules.genpseudoref.output
 	output:
 		bam="output/bam.dedup/{sample}.viterbi.bam"
 	shell:
-		"lofreq viterbi -f assets/NC_045512.3.fasta {input.bam} | samtools sort -o {output} && "
+		"lofreq viterbi -f {input.pseudoref} {input.bam} | samtools sort -o {output} && "
 		"samtools index {output}"  
 
 checkpoint getgenebam:
@@ -205,18 +219,22 @@ rule virulign:
 		"output/haplotype/{sample}/{gene}.fasta"
 
 	output:
-		"output/virulign/{gene}/{sample}.csv"
+		nt_alignment="output/virulign/gene/{sample}_{gene}_nt.fasta",
+		aa_alignment="output/virulign/gene/{sample}_{gene}_aa.fasta",
+		csv="output/virulign/{gene}/{sample}.csv"
 	
+	params: 
+		ref = lambda wildcards: "assets/virulign/{}.xml".format(wildcards.gene)
 	threads: 4
 	resources: 
 		mem=10
 	shell:
-		"virulign assets/virulign/{wildcards.gene}.xml {input} --exportReferenceSequence yes --exportKind PositionTable --exportAlphabet AminoAcids > {output}"
-
+		"OMP_NUM_THREADS={threads} python3 scripts/virulign.py -i {input} -n {output.nt_alignment} "
+		"-a {output.aa_alignment} -c {output.csv} -r {params.ref}"
 
 rule virulign_process:
 	input:
-		rules.virulign.output
+		rules.virulign.output.csv
 	output:
 		mut_table="output/mutation_tables/{sample}_{gene}.csv",
 		agg_table="output/agg_aatables/{sample}_{gene}.csv",
@@ -230,17 +248,14 @@ rule virulign_agg:
 		samp=lambda wildcards: expand("output/virulign/{gene}/{sample}.csv", sample=wildcards.sample, gene=get_genes(wildcards)),
 		genes=lambda wildcards: expand("output/mutation_tables/{sample}_{gene}.csv", sample=wildcards.sample, gene=get_genes(wildcards)) 
 	
-
-		
-
 	output:
 		virulign=temporary("output/{sample}_virulign.txt"),
 		agg_csv="output/mutation_tables_agg/{sample}_mutation_table_aggregate.csv"
-		
+
 	params:
 		agg_csv="output/{sample}_mutation_table_aggregate.csv"
 		
-	
+
 	run:
 		shell("touch {output.virulign}")
 		print("Input:",input.keys())
