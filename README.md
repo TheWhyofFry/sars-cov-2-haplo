@@ -13,6 +13,7 @@ There is nothing to cite and you can use/change it however you like but any crit
 
 _*Basic as the code is, I do expect people to not claim it as their own.*_
 
+If you want to drop me a line, send and email to werner.smidt@gmail.com
 
 # Requirements
 
