@@ -3,7 +3,6 @@ import subprocess
 import psutil
 
 def run_output(command):
-    print(command)
 
     command_split = list(map(lambda x:x.replace("#", " "),command.split(" ")))
     proc = subprocess.Popen(command_split, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -13,5 +12,4 @@ def run_output(command):
     returncode = proc.returncode
     
 
-    print("Current number of open files: ",len(psutil.Process().open_files()))
     return stdout, stderr, returncode

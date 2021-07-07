@@ -43,12 +43,26 @@ def cliquesnv_coords(genelist, genename, sample):
 	
 	return command_str
 
-def get_genes(wildcards):
-	checkpoints.getgenebam.get(**wildcards).output
+def get_genes_agg(sample_list, gene_list=genelist_df):
+	out_files = []
 
-	haplotype_info = pd.read_csv("output/haplotype/{sample}/{sample}_haplotype_info.txt".format(sample=wildcards.sample))
+	for sample in sample_list:
+		wildcards = snakemake.io.Wildcards()
+		wildcards.sample = sample
+		genes = get_genes(dict(sample=sample))
+
+		out_files.extend(expand("output/haplotype/{sample}/{genes}.fasta", sample=sample, gene=genes))
+
+
+	return out_files
+
+def get_genes(wildcards, gene_list=genelist_df, samples=None):
+
+	checkpoints.getgenebamstats.get(**wildcards).output
+	print("Checkpoint wildcard type",type(wildcards))
+	haplotype_info = pd.read_csv("output/haplotype/{sample}/{sample}_haplotype_info.txt".format(sample=wildcards["sample"]))
 	#haplotype_info[haplotype_info["pass"] == True]
-	haplotype_info = haplotype_info[haplotype_info.reads > 50]
+	haplotype_info = haplotype_info[(haplotype_info.reads > 50) & (haplotype_info.gene.isin(gene_list.gene))]
 	
 	gene = haplotype_info.gene.values
         return gene	
@@ -89,28 +103,25 @@ sample_df = get_input(config["inputdir"])
 
 sample_df.to_csv("./sampledf.csv")
 
+
 rule all:
 	input:
-		agg_csv="output/mutation_table_aggregate.csv"
-	output:
-		"output/done.txt"
-	shell:
-		'find output -name "*.bam" -exec rm {{}} \; ; touch {output}'
-
-
-
-rule dedupbam:
-	input:
-		bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename,
-		bai=lambda wildcards: "{bam}.bai".format(bam=sample_df.loc[wildcards.sample,].filename)
-		
-	output:
-		BAM=temporary("output/bam.dedup/{sample}.bam"),
-		M="output/dedup.metrics/{sample}.txt"
-
-	shell:
-		"picard MarkDuplicates I={input.bam} O={output.BAM} M={output.M}"
+		agg_csv="output/mutation_table_aggregate.csv",
+		#mut_agg=expand("output/mutation_tables_agg/{sample}_mutation_table_aggregate.csv", sample=sample_df.samplename),
+		#haplotypes=get_genes_agg(sample_df.samplename)
 	
+	shell:
+		'find output -name "*.bamasdas" -exec rm {{}} \;'
+
+"""
+rule bamindex:
+	input:
+		bam=lambda wildcards: sample_df.loc[wildcards.sample].filename
+	output:
+		bai="%s/{sample}.bam.bai"%(config["inputdir"])
+	shell:
+		"samtools index {input.bam}"
+"""
 
 rule genpseudoref:
 	input:
@@ -125,65 +136,97 @@ rule genpseudoref:
 	
 
 
+
+checkpoint getgenebamstats:
+	input:
+		bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename,
+		bai=lambda wildcards: "{bam}.bai".format(bam=sample_df.loc[wildcards.sample,].filename),
+		pseudo_ref=rules.genpseudoref.output
+	output:
+		haplotype_info="output/haplotype/{sample}/{sample}_haplotype_info.txt"
+	params:
+		genelist=sarscov2_genelist_initial,
+		output_dir="output/haplotype/{sample}/"
+	shell:
+		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample} -r {input.pseudo_ref} -b {input.bam} "
+		"-g {params.genelist} -o {params.output_dir} -s "
+		
+
+
+
+rule getgenebam:
+	input:
+		bam=lambda wildcards: sample_df.loc[wildcards.sample,].filename,
+		bai=lambda wildcards: "{bam}.bai".format(bam=sample_df.loc[wildcards.sample,].filename),
+		halpo_info=rules.getgenebamstats.output.haplotype_info,
+		pseudo_ref=rules.genpseudoref.output
+
+	output:
+		#expand("output/haplotype/{{sample}}/{gene}.bam",gene=genelist_df.gene)
+		temporary("output/haplotype/{sample}/{gene}.bam")
+	params:
+		genelist=sarscov2_genelist,
+		output_dir="output/haplotype/{sample}/",
+		gene=lambda wildcards: wildcards.gene
+	shell:
+		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample} -r {input.pseudo_ref} -b {input.bam} "
+		"-g {params.genelist} -o {params.output_dir}  -n -G {params.gene}"
+rule getgenebam_agg:
+        input:
+                lambda wildcards: expand("output/haplotype/{{sample}}/{gene}.bam", gene=get_genes(wildcards))
+
+        output:
+                "output/{sample}_haplotypes.txt"
+        shell:
+                "touch {output}"
+
+
+rule dedupbam:
+	input:
+		#bam="output/haplotype/{sample}/{gene}.bam"
+		bam=rules.getgenebam.output
+		
+	output:
+		BAM=temporary("output/haplotype/{sample}/{gene}.dedup.bam"),
+		M="output/dedup.metrics/{sample}.{gene}.txt"
+
+	shell:
+		"picard MarkDuplicates I={input.bam} O={output.BAM} M={output.M} 2> /dev/zero > /dev/zero"
+	
+
 rule lofreqviterbi:
 	input:
-		bam="output/bam.dedup/{sample}.bam",
+		bam=rules.dedupbam.output.BAM,
 		pseudoref=rules.genpseudoref.output
 	output:
-		bam="output/bam.dedup/{sample}.viterbi.bam"
+		bam="output/bam.dedup/{sample}_{gene}.viterbi.bam"
 	shell:
 		"lofreq viterbi -f {input.pseudoref} {input.bam} | samtools sort -o {output} && "
 		"samtools index {output}"  
 
-checkpoint getgenebam:
-	input:
-		bam="output/bam.dedup/{sample}.viterbi.bam"
-
-	output:
-		haplotype_info="output/haplotype/{sample}/{sample}_haplotype_info.txt",
-	params:
-		genelist=sarscov2_genelist,
-		output_dir="output/haplotype/{sample}/"
-	shell:
-		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample}  -b {input.bam} -g {params.genelist} -o {params.output_dir}  "
 
 
-rule getgenebam_agg:
-	input:
-		lambda wildcards: expand("output/haplotype/{{sample}}/{gene}", gene=get_genes(wildcards))
-
-	output:
-		"output/{sample}_haplotypes.txt"
-	shell:
-		"touch {output}"
-
-
-rule getgenebam_mark:
-	input:
-		bam="output/haplotype/{sample}/{gene}.bam"
-	output:
-		bam=temporary("output/haplotype/{sample}/{gene}.bam")
-	shell:
-		"touch {output.bam}"
 
 
 rule subsample_genebam:
         input:
-                bam="output/haplotype/{sample}/{gene}.bam"
+                bam=rules.lofreqviterbi.output.bam
         output:
                 bam=temporary("output/haplotype/{sample}/{gene}.downsample.bam")
 
         params: 
-                max_depth=1000
+                max_depth=8000
 
         shell: 
-                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | samtools sort - > {output.bam}"
+                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | "
+		"java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | "
+		"samtools sort - > {output.bam} && samtools index {output.bam}"
 
 
 
 rule cliquesnv:
 	input:
-		gene_bam="output/haplotype/{sample}/{gene}.downsample.bam",
+		gene_bam=rules.subsample_genebam.output.bam,
 		gene_orig_bam="output/haplotype/{sample}/{gene}.bam"
 	output:
 		cliquesnv="output/haplotype/{sample}/{gene}.downsample.fasta"
@@ -194,7 +237,7 @@ rule cliquesnv:
 	resources: 
 		mem=10
 	shell:
-		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && rm {input.gene_orig_bam}"
+		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -t 10 -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && rm {input.gene_orig_bam}"
 
 rule cliquesnvparse:
 	input:
@@ -225,12 +268,12 @@ rule virulign:
 	
 	params: 
 		ref = lambda wildcards: "assets/virulign/{}.xml".format(wildcards.gene)
-	threads: 4
+	threads: 1
 	resources: 
 		mem=10
 	shell:
 		"OMP_NUM_THREADS={threads} python3 scripts/virulign.py -i {input} -n {output.nt_alignment} "
-		"-a {output.aa_alignment} -c {output.csv} -r {params.ref}"
+		"-a {output.aa_alignment} -c {output.csv} -r {params.ref} -A"
 
 rule virulign_process:
 	input:

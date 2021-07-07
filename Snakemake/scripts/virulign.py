@@ -105,18 +105,7 @@ def find_missing_entries(query_fasta, virulign_fasta):
 
     
     missing_entries =  set(query_entries).difference(virulign_entries)
-    print("MISSING ENTRIES:", missing_entries, len(query_fasta), len(virulign_fasta))
     return [(title, seq) for title,seq in query_fasta if title in missing_entries]
-
-
-def blast(missing_entries, blast_db, blast_prog="blastn", other_options=""):
-
-
-    blast_command = "{blast_prog} -query {query} -db {blast_db} -outfmt '6 qseqid sseqid pident length mismatch qstart qend sstart send bitscore qseq sseq' {other_options}"
-
-
-
-    stdout, stderr, returncode = run_output(blast_command)
 
 
 
@@ -147,203 +136,6 @@ def initial_alignment(fasta_file, virulign_ref_file, virulign_command="virulignm
 
 
         
-def do_secondary(missing_entries, ref_entry, virulign_params={}):
-    
-    code, temp_ref_file = tempfile.mkstemp(prefix="virulign-tools", suffix=".fasta", dir="/tmp")
-    code, temp_missing_file = tempfile.mkstemp(prefix="virulign-tools", suffix=".fasta", dir="/tmp")
-    print("TEMP MISSING FILE:", temp_missing_file)
-    write_fasta(missing_entries, temp_missing_file)
-
-    with open(temp_ref_file, 'w') as temp_ref:
-        temp_ref.write(">%s\n%s\n"%(ref_entry))
-
-    
-    # We'll just directly assume frameshifts are OK
-    secondary_alignment = initial_alignment(temp_missing_file, temp_ref_file,  **virulign_params)
-
-    secondary_missing_entries = find_missing_entries(missing_entries, secondary_alignment)
-
-    if len(secondary_missing_entries) > 0:
-        missing_entries = secondary_missing_entries
-    
-
-    #os.unlink(temp_ref_file)
-    #os.unlink(temp_missing_file)
-
-
-    return secondary_alignment, secondary_missing_entries
-
-def hamming(s1,s2):
-    return sum([1 for a,b in zip(s1,s2) if a != b])
-
-def get_valid_hits(blastx_hits):
-
-        valid_hits = list(blastx_hits.sstart.diff().values[1:] >= 0) + [True]
-       
-
-        blastx_hits = blastx_hits[valid_hits] 
-        print(blastx_hits[["qstart","qend", "sstart","send"]])
-        print(valid_hits)
-        valid_hits = [True] + list(blastx_hits.send.diff().values[1:] >= 0) 
-        
-
-        blastx_hits = blastx_hits[valid_hits]
-
-        print(blastx_hits[["qstart","qend","sstart","send"]])
-        return blastx_hits
-
-def remove_embedded(blastx_hits):
-    
-    if len(blastx_hits) == 1:
-        return blastx_hits
-
-
-    blastx_hits = blastx_hits.sort_values(["sstart","send"], ascending=[True,False]).copy()
-    # Debug counter
-    counter = 0 
-    l = len(blastx_hits)
-    while True:
-        if counter > l:
-            break
-        sstart = blastx_hits.sstart.values
-        send   = blastx_hits.send.values
-
-
-        within_start = sstart[1:] > sstart[:-1]
-        within_end   = send[1:] < send[:-1]
-
-        logical = [True]
-        logical.extend(~(within_end & within_start))
-        
-        if len(blastx_hits[logical]) == len(blastx_hits):
-            return blastx_hits
-        blastx_hits = blastx_hits[logical]
-        
-        counter += 1
-
-
-
-    return blastx_hits
-
-
-def recreate_seq(blastx_hits):
-
-    # Sort according to query start position
-    blastx_hits = blastx_hits.sort_values("qstart")
-
-    # Remove spurious alignments 
-    # Check if the qstart/sstart sequences follow ascendingly
-
-
-    # If multiple hits, we need to check how to concatenate them
-    # If there are overlaps, resolve which alignment is the best (hamming distance - with ties, the first is used)
-    # If there are not, replace the frameshifted region (non-matchin region) with X
-    chain = []
-    if len(blastx_hits) > 1:
-        blastx_hits = get_valid_hits(blastx_hits)
-        # iterate through 
-        current_hit = blastx_hits.iloc[0,]
-        current_hit.mask = 0
-        current_hit.qseq_remap = remap(current_hit.qseq)
-        current_hit.sseq_remap = remap(current_hit.sseq)
-
-    
-        blastx_hits = blastx_hits.iloc[1:,]
-
-
-        for idx,hit_ in blastx_hits.iterrows():
-            hit = hit_.copy()
-            hit.mask = 0
-            hit.sseq_remap = remap(hit.sseq)
-            hit.qseq_remap = remap(hit.qseq)
-            print("Current hit end: {qend}; hit start: {qstart}".format(qend=current_hit.qend, qstart=hit.qstart))
-            if hit.qstart < current_hit.qend:
-                aa_pos_span = math.ceil((current_hit.qend - hit.qstart + 1)/3)
-                
-                aa_pos_remap_qseq_current_hit = current_hit.qseq_remap.index.max() - aa_pos_span
-                aa_pos_remap_qseq_hit = hit.qseq_remap[aa_pos_span]
-
-                hamming_hit = hamming(hit.qseq[:aa_pos_remap_qseq_hit], hit.sseq[:aa_pos_remap_qseq_hit])
-                hamming_current_hit = hamming(current_hit.qseq[:aa_pos_remap_qseq_current_hit], current_hit.sseq[:aa_pos_remap_qseq_current_hit])
-                
-
-                if hamming_hit < hamming_current_hit:
-                    o = current_hit.qseq_remap.index.max() - aa_pos_span + 1
-                    trim_pos = current_hit.qseq_remap.loc[current_hit.qseq_remap.index.max() - aa_pos_span + 1]
-                    qseq = current_hit.qseq
-                    print("Trim pos:",trim_pos, aa_pos_span, o, len(current_hit.qseq), hit.sstart, hit.send)
-                    current_hit.qseq = current_hit.qseq[:trim_pos]
-                    print(qseq, len(qseq), current_hit.qseq, len(current_hit.qseq))
-                    
-
-                else:
-                    print("Hit adjusted")
-                    mask = hit.qseq_remap[aa_pos_span-1]
-                    hit.qseq = hit.qseq[mask:]
-                    hit.sseq = hit.sseq[mask:]
-                    hit.qseq_remap = remap(hit.qseq)
-                    hit.sseq_remap = remap(hit.sseq)
-
-
-
-            else:
-                delta = hit.qstart - current_hit.qend + 1
-                print("Delta: ",delta)
-                aa_pos_span = math.ceil(delta / 3)
-                current_hit.qseq += "X" * aa_pos_span
-
-            chain.append(current_hit.qseq)
-
-            current_hit = hit
-        chain.append(current_hit.qseq[current_hit.mask:])
-
-    else:
-        chain.append(blastx_hits.qseq.value[0])
-
-
-    return (blastx_hits.qseqid.values[0], "".join(chain))
-
-
-def blastx_align(fasta_list, blastdb):
-    
-
-    temp_blast_query = mkstemp(prefix="virulign-tools-blastx",suffix=".fasta")
-
-    write_fasta(fasta_list, temp_blast_query)
-    
-    BLASTX_COMMAND = "blastx -db {db} -query {query} -outfmt '6#qseqid#sseqid#bitscore#qstart#qend#qseq'"
-
-    blast_output, stderr, returncode = run_command(BLASTX_COMMAND.format(blastdb, temp_blast_query))
-
-    if returncode == 0:
-        with open(io.StringIO(blast_output)) as blast_output_f:
-            blastx_df = pd.read_table(blast_output_f, names=["qseqid", "sseqid", "bitscore", "qstart", "qend", "qseq"]).\
-                            sort_values(["qseqid","qstart"])
-
-            blastx_df_maxbitscores = blastx_df.group_by(["qseqid","sseqid"]).\
-                    aggregate({'bitscore': lambda x:x.bitscore.sum()}).\
-                    sort_values("bitscore",ascending=False).reset_index().\
-                    groupby("qseqid").first().\
-                    reset_index()
-
-
-
-            
-            
-
-
-
-    return
-
-def write_fasta(fasta_list, fasta_file):
-
-    with open(fasta_file, "w") as ofile:
-        for title,seq in fasta_list:
-            ofile.write(">%s\n%s\n"%(title,seq))
-
-
-    return
-
 
 def mafft_wrapper(input_fasta, options="--globalpair", tmp_dir="/tmp"):
     
@@ -362,7 +154,6 @@ def mafft_wrapper(input_fasta, options="--globalpair", tmp_dir="/tmp"):
 
 def viruligndf(fasta_entries):
 
-    print([(title,seq[:20]) for title,seq in fasta_entries]) 
     name, ref = fasta_entries[0]
 
     name = name.split(" ")[0]    
@@ -402,7 +193,8 @@ if __name__ == "__main__":
     parser.add_argument("-c", type=str, dest="output_csv_aa", help="Output CSV  file (aa - virulign positional table output)")
     parser.add_argument("-r", type=str, dest="virulign_ref_file", help="Initial Virulign reference file")
     parser.add_argument("-s", type=int, dest="num_alignments", help="Number of blast alignments", default=20)
-
+    parser.add_argument("-t", type=str, dest="tmp", default="/tmp", help="Location of temporary directory")
+    parser.add_argument("-A", dest="aga_only", action="store_true", help="Skip virulign and align everything with AGA")
     
     args = parser.parse_args()
 
@@ -429,14 +221,21 @@ if __name__ == "__main__":
 
     # Missing alignemnts
 
-    missing_entries = find_missing_entries(fasta_initial, fasta_initial_alignment_nt)
+    if args.aga_only:
+        missing_entries = fasta_initial
+        fasta_initial_alignment_nt = []
+        fasta_initial_alignment_aa = []
+
+    else:
+        missing_entries = find_missing_entries(fasta_initial, fasta_initial_alignment_nt)
     temp_alignments_aa = []
     temp_alignments_nt = []
     n_missing_entries = len(missing_entries)
+
     
 
     if n_missing_entries > 0:
-        code, missing_entries_file = tempfile.mkstemp(prefix="virulign-tools", suffix=".fasta",dir="/tmp")
+        code, missing_entries_file = tempfile.mkstemp(prefix="virulign-tools", suffix=".fasta",dir=args.tmp)
         write_fasta(missing_entries, missing_entries_file)
 
             
@@ -447,7 +246,6 @@ if __name__ == "__main__":
         for title,seq in missing_entries:
 
             aga = agagen.run_aga((title,seq,), genbank_str=gb, delete_temp=True)
-            print("Number of open files:", len(proc.open_files()))
             aa_align, nt_align, full_align = aga
 
             aa_align = agagen.extract_aligned_seqs(aa_align,title=title,full=False,replace_char="X")
@@ -467,24 +265,19 @@ if __name__ == "__main__":
 
         missing_entries = missing_entries_aga
 
-    print("AGA RECOVERED:")
-    print([title for title,seq in temp_alignments_aa])
     final_alignments_aa = fasta_initial_alignment_aa + temp_alignments_aa
     final_alignments_nt = fasta_initial_alignment_nt + temp_alignments_nt
 
     if len(final_alignments_aa) > 0:
         with open(args.output_fasta_aa, "w") as ofile_aa:
-            s = mafft_wrapper([reference_aa]+final_alignments_aa)
+            s = mafft_wrapper([reference_aa]+final_alignments_aa, options="--localpair --maxiterate 1000 --retree 10")
             ofile_aa.write(s)
 
         with open(args.output_fasta_nt, "w") as ofile_nt:
             s = mafft_wrapper([reference_nt]+final_alignments_nt)
             ofile_nt.write(s)
 
-        print("Wrote %s AA sequences and %s NT sequences:"%(len(fasta_initial_alignment_nt), len(fasta_initial_alignment_aa)))
     
-    #:virulign_df_nt = viruligndf([reference_nt] + final_alignments_nt)
-    print(reference_aa)
     try:
         virulign_aa = read_fasta(args.output_fasta_aa)
         virulign_df_aa = viruligndf(virulign_aa)
@@ -494,8 +287,6 @@ if __name__ == "__main__":
         pathlib.Path(args.output_fasta_aa).touch()
         pathlib.Path(args.output_fasta_nt).touch()
 
-    if len(missing_entries) > 0:
-        print("Some sequences could not be aligned: \n %s"%("\n".join([title for title,seq in missing_entries])))
 
     
 
