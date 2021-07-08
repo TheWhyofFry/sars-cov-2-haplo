@@ -26,6 +26,7 @@ The following modules are needed:
 
 2. General:
   - samtools
+  - [PicardTools](https://broadinstitute.github.io/picard/)
   - [virulign](https://github.com/rega-cev/virulign) 
   - [cliquesnv](https://github.com/vtsyvina/CliqueSNV/archive/refs/tags/1.5.7.tar.gz) 
   - [AGA](https://github.com/emweb/aga)
