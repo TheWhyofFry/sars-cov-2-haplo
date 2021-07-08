@@ -24,7 +24,7 @@ def get_gene_stats(bam, genelist, ref):
     for i, row in genelist.iterrows():
 
         reads = bam.count(contig=ref, start=row.start, end=row.end)
-        reads_base = int(reads/(row.start-row.end+1))
+        reads_base = int(reads/(row.end-row.start+1))
 
         rows.append((row.gene, reads, reads_base))
 

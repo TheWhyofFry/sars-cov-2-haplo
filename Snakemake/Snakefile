@@ -110,8 +110,6 @@ rule all:
 		#mut_agg=expand("output/mutation_tables_agg/{sample}_mutation_table_aggregate.csv", sample=sample_df.samplename),
 		#haplotypes=get_genes_agg(sample_df.samplename)
 	
-	shell:
-		'find output -name "*.bamasdas" -exec rm {{}} \;'
 
 """
 rule bamindex:
@@ -163,22 +161,14 @@ rule getgenebam:
 
 	output:
 		#expand("output/haplotype/{{sample}}/{gene}.bam",gene=genelist_df.gene)
-		temporary("output/haplotype/{sample}/{gene}.bam")
+		temporary("output/bam/original/{sample}/{gene}.bam")
 	params:
 		genelist=sarscov2_genelist,
-		output_dir="output/haplotype/{sample}/",
+		output_dir="output/bam/original/{sample}",
 		gene=lambda wildcards: wildcards.gene
 	shell:
 		"python3 scripts/cliquesnvhaplo.py -p {wildcards.sample} -r {input.pseudo_ref} -b {input.bam} "
 		"-g {params.genelist} -o {params.output_dir}  -n -G {params.gene}"
-rule getgenebam_agg:
-        input:
-                lambda wildcards: expand("output/haplotype/{{sample}}/{gene}.bam", gene=get_genes(wildcards))
-
-        output:
-                "output/{sample}_haplotypes.txt"
-        shell:
-                "touch {output}"
 
 
 rule dedupbam:
@@ -187,7 +177,7 @@ rule dedupbam:
 		bam=rules.getgenebam.output
 		
 	output:
-		BAM=temporary("output/haplotype/{sample}/{gene}.dedup.bam"),
+		BAM=temporary("output/bam/dedup/{sample}_{gene}.dedup.bam"),
 		M="output/dedup.metrics/{sample}.{gene}.txt"
 
 	shell:
@@ -199,7 +189,7 @@ rule lofreqviterbi:
 		bam=rules.dedupbam.output.BAM,
 		pseudoref=rules.genpseudoref.output
 	output:
-		bam="output/bam.dedup/{sample}_{gene}.viterbi.bam"
+		bam=temporary("output/bam/viterbi/{sample}_{gene}.viterbi.bam")
 	shell:
 		"lofreq viterbi -f {input.pseudoref} {input.bam} | samtools sort -o {output} && "
 		"samtools index {output}"  
@@ -215,11 +205,11 @@ rule subsample_genebam:
                 bam=temporary("output/haplotype/{sample}/{gene}.downsample.bam")
 
         params: 
-                max_depth=8000
+                max_depth=3000
 
         shell: 
-                "java -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | "
-		"java -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | "
+                "java -Xmx2G -XX:ParallelGCThreads=1 -jar tools/sortsamrefname.jar {input.bam} 2> /dev/zero | "
+		"java -Xmx2G -XX:ParallelGCThreads=1 -jar tools/biostar154220.jar -n {params.max_depth} 2> /dev/zero | "
 		"samtools sort - > {output.bam} && samtools index {output.bam}"
 
 
@@ -227,7 +217,6 @@ rule subsample_genebam:
 rule cliquesnv:
 	input:
 		gene_bam=rules.subsample_genebam.output.bam,
-		gene_orig_bam="output/haplotype/{sample}/{gene}.bam"
 	output:
 		cliquesnv="output/haplotype/{sample}/{gene}.downsample.fasta"
 	params:
@@ -237,7 +226,7 @@ rule cliquesnv:
 	resources: 
 		mem=10
 	shell:
-		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -t 10 -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero && rm {input.gene_orig_bam}"
+		"java -Xmx8G -jar tools/clique-snv.jar {params.clique_coord} -t 10 -tf 0.01 -m snv-illumina -in {input.gene_bam} -outDir {params.outdir} -threads {threads} > /dev/zero"
 
 rule cliquesnvparse:
 	input:
